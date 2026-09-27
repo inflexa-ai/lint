@@ -107,6 +107,9 @@ func (c config) run(pass *analysis.Pass) {
 			if !ok || !slices.Contains(c.hooks, sel.Sel.Name) {
 				continue
 			}
+			if s := pass.TypesInfo.Selections[sel]; s == nil || s.Kind() != types.MethodVal {
+				continue
+			}
 			for _, arg := range n.Args {
 				if fn, ok := ast.Unparen(arg).(*ast.FuncLit); ok {
 					lit, _ := cur.FindNode(fn)

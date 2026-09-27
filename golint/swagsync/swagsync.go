@@ -82,6 +82,9 @@ func run(pass *analysis.Pass, register []string) {
 		if !ok || len(call.Args) < 2 || !slices.Contains(register, sel.Sel.Name) {
 			continue
 		}
+		if s := pass.TypesInfo.Selections[sel]; s == nil || s.Kind() != types.MethodVal {
+			continue
+		}
 		fn := handler(pass.TypesInfo, call.Args[1])
 		if fn == nil || local[fn] || (fn.Pkg() != pass.Pkg && pass.ImportObjectFact(fn, new(routeDoc))) {
 			continue

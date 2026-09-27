@@ -29,3 +29,11 @@ func Routes(g *Group) {
 	g.Other("/other", undocumented)
 	g.HandleGET("/inline", func(w http.ResponseWriter, r *http.Request) {})
 }
+
+type RouteFields struct {
+	HandleGET func(path string, fn http.HandlerFunc)
+}
+
+func FieldNamedLikeRegister(m RouteFields) {
+	m.HandleGET("/field", undocumented)
+}

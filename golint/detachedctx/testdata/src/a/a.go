@@ -101,3 +101,13 @@ func Parenthesized(ctx context.Context, inv Invalidator, tx Tx) {
 func Aliased(ctx requestContext) {
 	defer unsubscribe(ctx) // want `the cleanup call takes the context ctx`
 }
+
+type HookFields struct {
+	AfterCommit func(fn func())
+}
+
+func FieldNamedLikeHook(ctx context.Context, inv Invalidator, h HookFields) {
+	h.AfterCommit(func() {
+		inv.Invalidate(ctx, "key")
+	})
+}

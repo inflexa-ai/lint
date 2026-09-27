@@ -174,6 +174,7 @@ A release of the module is a tag `golint/vX.Y.Z`, and `go get` names it as
 file, `tools/go.mod`:
 
 ```sh
+mkdir tools
 go mod init -modfile=tools/go.mod example.com/svc/tools
 go get -modfile=tools/go.mod -tool github.com/inflexa-ai/lint/golint/cmd/inflexa-lint@v0.1.0
 go get -modfile=tools/go.mod -tool github.com/inflexa-ai/lint/golint/cmd/inflexa-lint-config@v0.1.0
