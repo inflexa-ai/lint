@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["ES2023"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "types": ["node"],
+    "strict": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    // A relative import names the source file, `./rule.ts`. The compiler writes
+    // `./rule.js` into the output, thus vitest runs the source with no build and
+    // Node runs the output.
+    "rewriteRelativeImportExtensions": true,
+    // A workspace package resolves another one to its source through the
+    // `source` condition of `exports`. A published consumer never sets it.
+    "customConditions": ["source"]
+  }
+}

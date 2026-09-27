@@ -1,0 +1,54 @@
+//go:build ruleguard
+
+// Package gorules holds the ruleguard patterns of golint. gocritic loads this
+// file at run time. The build tag keeps it out of each build, test and vet,
+// while go mod tidy still sees its dsl import and keeps the requirement.
+package gorules
+
+import "github.com/quasilyte/go-ruleguard/dsl"
+
+func uuidConversion(m dsl.Matcher) {
+	m.Match(`pgconv.ToUUID(uuid.UUID($x))`, `pgconv.ToUUID($x.ToUnderlying())`).
+		Where(m.File().Imports(`{{module}}/kernel/pgconv`)).
+		Report(`convert $x with one spelling: make pgconv.ToUUID generic over ~[16]byte, then pass $x as it is`)
+}
+
+func pathIDParse(m dsl.Matcher) {
+	m.Match(`uuid.Parse($r.PathValue($_))`).
+		Where(m.File().Imports(`github.com/google/uuid`) && m["r"].Type.Is(`*http.Request`)).
+		Report(`parse a path ID with one generic helper, request.PathID[T], so that each handler answers a bad ID the same way`)
+}
+
+func concZeroBound(m dsl.Matcher) {
+	m.Match(
+		`conc.ParallelMap($_, $_, $n, $_)`,
+		`conc.ParallelMap[$_, $_]($_, $_, $n, $_)`,
+		`conc.NewWorkerPool($_, $n)`,
+		`conc.NewOptionGroup[$_]($_, $n)`,
+		`conc.NewResultGroup[$_]($_, $n)`,
+		`conc.NewCancelOnErrResultGroup[$_]($_, $n)`,
+	).
+		Where(m["n"].Const && m["n"].Value.Int() == 0 &&
+			m.File().Imports(`{{module}}/kernel/conc`) &&
+			!m.File().PkgPath.Matches(`/kernel/conc(_test)?$`)).
+		At(m["n"]).
+		Report(`the bound 0 starts one goroutine for each item: pass a positive bound`)
+}
+
+func floatSum(m dsl.Matcher) {
+	m.Match(`decimal.NewFromFloat($x + $y)`).
+		Where(m.File().Imports(`github.com/shopspring/decimal`)).
+		Report(`the float sum loses precision before the conversion: convert each operand, then add the decimals`)
+}
+
+func truncateInTest(m dsl.Matcher) {
+	m.Match(
+		`$_($s, $*_)`, `$_($_, $s, $*_)`, `$_($_, $_, $s, $*_)`,
+		`$_ := $s`, `$_ = $s`, `var $_ = $s`, `const $_ = $s`, `return $s`,
+	).
+		Where(m["s"].Node.Is(`BasicLit`) &&
+			m["s"].Text.Matches(`(?i)\bTRUNCATE\b`) &&
+			m.File().Name.Matches(`_test\.go$`)).
+		At(m["s"]).
+		Report(`a hand-written TRUNCATE list goes stale when a table is added: reset the database through testutil`)
+}

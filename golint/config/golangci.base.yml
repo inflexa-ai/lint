@@ -1,0 +1,369 @@
+version: "2"
+
+run:
+  relative-path-mode: gomod
+  tests: true
+
+linters:
+  default: none
+  enable:
+    # standard set
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    # error handling
+    - errorlint
+    - nilnesserr
+    # context, HTTP, logging
+    - noctx
+    - sloglint
+    - forbidigo
+    - containedctx
+    # correctness guards
+    - asasalint
+    - bidichk
+    - durationcheck
+    - fatcontext
+    - loggercheck
+    - makezero
+    - reassign
+    - sqlclosecheck
+    # security
+    - gosec
+    # tests
+    - testifylint
+    - usetesting
+    - thelper
+    # types and switches
+    - exhaustive
+    - musttag
+    - unconvert
+    # diagnostics and hygiene
+    - gocritic
+    - revive
+    - godoclint
+    - nolintlint
+    - misspell
+    # modern Go, autofixable
+    - copyloopvar
+    - intrange
+    - modernize
+    # complexity ceiling
+    - gocognit
+    # architecture layers
+    - depguard
+    # the golint plugins of inflexa-lint
+    - typedids
+    - errtext
+    - notfoundguard
+    - blankerr
+    - boundedfanout
+    - detachedctx
+    - keyowner
+    - rawhttp
+    - anyapi
+    - testplacement
+    - swagsync
+  settings:
+    errcheck:
+      # blankerr holds the rule for a discarded error.
+      check-blank: false
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment
+        - shadow
+    exhaustive:
+      default-signifies-exhaustive: true
+    forbidigo:
+      analyze-types: true
+      forbid:
+        - pattern: ^context\.(Background|TODO)$
+          msg: take the context from the caller; detach with context.WithoutCancel
+        - pattern: ^http\.(Get|Post|PostForm|Head|DefaultClient)$
+          msg: use an http.Client with a timeout and a request built with NewRequestWithContext
+        - pattern: ^time\.Sleep$
+          msg: wait with a select on ctx.Done() and a timer
+        - pattern: ^http\.Error$
+          msg: write the error body through handler/response, so that each error has one JSON shape
+    gocognit:
+      min-complexity: 30
+    gocritic:
+      enabled-checks:
+        - ruleguard
+      settings:
+        ruleguard:
+          # A rules file that does not load fails the run, so that no rule is skipped in silence.
+          failOn: dsl,import
+          rules: ${config-path}/golangci/rules.go
+    gosec:
+      excludes:
+        - G101 # header names and test fixtures match the credential regex
+        - G104 # duplicate of errcheck
+        - G404 # math/rand for backoff jitter
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+      allow-unused: false
+    revive:
+      rules:
+        # golangci-lint defaults without exported, package-comments, unused-parameter
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: dot-imports
+        - name: empty-block
+        - name: error-naming
+        - name: error-return
+        - name: error-strings
+        - name: errorf
+        - name: increment-decrement
+        - name: indent-error-flow
+        - name: range
+        - name: receiver-naming
+        - name: redefines-builtin-id
+        - name: superfluous-else
+        - name: time-naming
+        - name: unexported-return
+        - name: unreachable-code
+        - name: var-declaration
+        - name: var-naming
+        # bug-oriented additions
+        - name: datarace
+        - name: defer
+        - name: identical-branches
+        - name: identical-ifelseif-conditions
+        - name: identical-switch-conditions
+        - name: unconditional-recursion
+        - name: waitgroup-by-value
+        - name: range-val-address
+    sloglint:
+      context: scope
+      key-naming-case: snake
+      forbidden-keys:
+        - err
+    depguard:
+      rules:
+        kernel:
+          list-mode: lax
+          files:
+            - ${base-path}/kernel/**
+          deny:
+            - pkg: "{{module}}/modules"
+              desc: kernel is the lowest layer; move the shared type into kernel
+            - pkg: "{{module}}/provider"
+              desc: kernel is the lowest layer; a provider depends on kernel, not the reverse
+            - pkg: "{{module}}/handler"
+              desc: kernel is the lowest layer; a handler depends on kernel, not the reverse
+            - pkg: "{{module}}/middleware"
+              desc: kernel is the lowest layer; middleware depends on kernel, not the reverse
+            - pkg: "{{module}}/config"
+              desc: kernel is the lowest layer; pass the configuration value as an argument
+            - pkg: "{{module}}/testutil"
+              desc: kernel is the lowest layer; test helpers depend on kernel, not the reverse
+        no-app-concerns:
+          list-mode: lax
+          files:
+            - ${base-path}/testutil/**
+            - ${base-path}/handler/response/**
+            - ${base-path}/handler/request/**
+          deny:
+            - pkg: "{{module}}/modules"
+              desc: a shared helper must not know a module; take the value as an argument
+        handler:
+          list-mode: lax
+          files:
+            - ${base-path}/handler/**
+          deny:
+            - pkg: "{{module}}/kernel/pgerr"
+              desc: classify storage errors in the module; match the sentinels of the module in the handler
+            - pkg: github.com/riverqueue/river
+              desc: enqueue a job through the module, not from the handler
+        middleware:
+          list-mode: lax
+          files:
+            - ${base-path}/middleware/**
+          deny:
+            - pkg: "{{module}}/handler"
+              desc: middleware sits below the handlers; a handler depends on middleware, not the reverse
+        module-tests:
+          list-mode: lax
+          files:
+            - ${base-path}/modules/**/*_test.go
+          deny:
+            - pkg: "{{module}}/handler"
+              desc: a module test tests the module; test a handler in the handler tree
+        unversioned:
+          list-mode: lax
+          files:
+            - ${base-path}/handler/unversioned/**
+          deny:
+            - pkg: "{{module}}/handler/v1/types"
+              desc: the unversioned API must not depend on the types of a versioned API
+        errgroup:
+          list-mode: lax
+          files:
+            - $all
+            - "!${base-path}/kernel/conc/**"
+          deny:
+            - pkg: golang.org/x/sync/errgroup
+              desc: use the bounded helpers of kernel/conc
+        testcontainers:
+          list-mode: lax
+          files:
+            - $all
+            - "!${base-path}/testutil/**"
+          deny:
+            - pkg: github.com/testcontainers/testcontainers-go
+              desc: start test infrastructure through testutil
+        no-module-mocking:
+          list-mode: lax
+          files:
+            - $all
+          deny:
+            - pkg: github.com/golang/mock
+              desc: test against the real dependency through testutil, not a mock
+            - pkg: go.uber.org/mock
+              desc: test against the real dependency through testutil, not a mock
+            - pkg: github.com/vektra/mockery
+              desc: test against the real dependency through testutil, not a mock
+            - pkg: github.com/stretchr/testify/mock
+              desc: test against the real dependency through testutil, not a mock
+    custom:
+      typedids:
+        type: module
+        description: Use the typed ID in place of uuid.UUID.
+        original-url: https://github.com/inflexa-ai/lint/blob/main/docs/rules/typedids.md
+        settings:
+          ids-package: "{{module}}/kernel/ids"
+      errtext:
+        type: module
+        description: Classify an error by its identity, not by its text.
+        original-url: https://github.com/inflexa-ai/lint/blob/main/docs/rules/errtext.md
+      notfoundguard:
+        type: module
+        description: Answer 404 only for an error that a check classified as not found.
+        original-url: https://github.com/inflexa-ai/lint/blob/main/docs/rules/notfoundguard.md
+        settings:
+          guards:
+            - "{{module}}/kernel/pgerr.IsNotFound"
+      blankerr:
+        type: module
+        description: State the reason for a discarded error in a SAFETY comment.
+        original-url: https://github.com/inflexa-ai/lint/blob/main/docs/rules/blankerr.md
+      boundedfanout:
+        type: module
+        description: Bound each fan-out, and give each goroutine a join or a stop.
+        original-url: https://github.com/inflexa-ai/lint/blob/main/docs/rules/boundedfanout.md
+        settings:
+          allowed-packages:
+            - "{{module}}/kernel/conc"
+      detachedctx:
+        type: module
+        description: Give a cleanup a context that the request cannot cancel.
+        original-url: https://github.com/inflexa-ai/lint/blob/main/docs/rules/detachedctx.md
+        settings:
+          hook-methods:
+            - AfterCommit
+            - OnRollback
+          exempt-packages:
+            - log/slog
+            - go.opentelemetry.io/otel
+      keyowner:
+        type: module
+        description: Take a key from the package that owns it.
+        original-url: https://github.com/inflexa-ai/lint/blob/main/docs/rules/keyowner.md
+      rawhttp:
+        type: module
+        description: Use the approved packages for HTTP clients and request bodies.
+        original-url: https://github.com/inflexa-ai/lint/blob/main/docs/rules/rawhttp.md
+        settings:
+          body-packages:
+            - "{{module}}/handler/request"
+      anyapi:
+        type: module
+        description: Give an exported API a type that states its shape.
+        original-url: https://github.com/inflexa-ai/lint/blob/main/docs/rules/anyapi.md
+      testplacement:
+        type: module
+        description: Keep a test in the tests folder, or name it as an internal test.
+        original-url: https://github.com/inflexa-ai/lint/blob/main/docs/rules/testplacement.md
+      swagsync:
+        type: module
+        description: Make the Swagger annotations of a handler agree with its code.
+        original-url: https://github.com/inflexa-ai/lint/blob/main/docs/rules/swagsync.md
+        settings:
+          register-methods:
+            - HandleGET
+            - HandlePOST
+            - HandlePUT
+            - HandlePATCH
+            - HandleDELETE
+  exclusions:
+    generated: strict
+    paths:
+      - ^docs/
+      - (^|/)internal/repo/
+    rules:
+      - path: _test\.go
+        linters:
+          - noctx
+          - gosec
+          - forbidigo
+      # Test helpers and the ID generator: CLI output, file modes, and process-level contexts are intended.
+      - path: ^(testutil/|kernel/ids/gen/)
+        linters:
+          - gosec
+      - path: ^(cmd/|testutil/|kernel/ids/gen/)
+        linters:
+          - forbidigo
+          - gocognit
+      # The handler rules read handler shapes; the analyzers know no path.
+      - path-except: ^handler/
+        linters:
+          - notfoundguard
+          - swagsync
+      - path-except: ^modules/
+        linters:
+          - testplacement
+      # A test function is not an exported API.
+      - path: _test\.go
+        linters:
+          - boundedfanout
+          - rawhttp
+          - swagsync
+          - anyapi
+      # main starts its servers and workers for the life of the process.
+      - path: ^cmd/
+        linters:
+          - boundedfanout
+      - path: ^kernel/types/
+        linters:
+          - anyapi
+      - path: ^kernel/conc/
+        linters:
+          - containedctx
+      - path: ^handler/response/
+        linters:
+          - forbidigo
+        text: http\.Error
+      - path-except: ^handler/
+        linters:
+          - gocritic
+        text: "ruleguard: parse a path ID"
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - "{{module}}"
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  uniq-by-line: false

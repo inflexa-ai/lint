@@ -1,0 +1,30 @@
+{
+  "name": "@inflexa-ai/oxlint-workspace",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "typescript",
+    "react"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "typecheck": "npm run typecheck --workspaces",
+    "test": "npm test --workspaces",
+    "lint": "npm run lint:oxlint && npm run lint:eslint && npm run lint:directives",
+    "lint:oxlint": "NODE_OPTIONS=--conditions=source oxlint",
+    "lint:eslint": "NODE_OPTIONS=--conditions=source eslint .",
+    "lint:directives": "node --conditions=source typescript/src/directives/cli.ts --ignore \"typescript/src/directives/test/**\" .",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.6",
+    "@typescript-eslint/rule-tester": "^8.70.1",
+    "eslint": "^10.10.0",
+    "oxfmt": "0.70.0",
+    "oxlint": "1.85.0",
+    "oxlint-tsgolint": "7.0.2003",
+    "typescript": "~6.0.2",
+    "vitest": "^5.0.1"
+  }
+}

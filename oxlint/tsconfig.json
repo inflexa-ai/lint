@@ -1,0 +1,8 @@
+{
+  // The type check of the lint configuration, which no package includes. The
+  // base maps each workspace package to its source, as `npm run lint` loads it,
+  // thus the check needs no build.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": { "noEmit": true },
+  "include": ["oxlint.config.ts"]
+}

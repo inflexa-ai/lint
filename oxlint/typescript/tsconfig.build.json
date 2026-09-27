@@ -1,0 +1,11 @@
+{
+  // The build of the published package: the sources, and no test.
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "declaration": true
+  },
+  "include": ["src"],
+  "exclude": ["src/**/test"]
+}
