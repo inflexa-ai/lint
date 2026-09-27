@@ -1,0 +1,82 @@
+{
+  "name": "@inflexa-ai/oxlint-plugin-react",
+  "version": "0.1.0",
+  "description": "The oxlint rules and configuration of Inflexa for React applications, and the ESLint configuration of its typed rule.",
+  "keywords": [
+    "oxlint",
+    "oxlint-plugin",
+    "eslint",
+    "eslintplugin",
+    "eslint-plugin",
+    "react",
+    "typescript"
+  ],
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/inflexa-ai/lint.git",
+    "directory": "oxlint/react"
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./plugin": {
+      "source": "./src/js-plugin.ts",
+      "types": "./dist/js-plugin.d.ts",
+      "default": "./dist/js-plugin.js"
+    },
+    "./eslint": {
+      "source": "./src/eslint.ts",
+      "types": "./dist/eslint.d.ts",
+      "default": "./dist/eslint.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json --removeComments --declaration false && tsc -p tsconfig.build.json --emitDeclarationOnly",
+    "prepublishOnly": "echo \"Publish through scripts/release.mjs at the root of the workspace, which stages a clean package.\" && exit 1",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "eslint": "^10.0.0",
+    "eslint-plugin-better-tailwindcss": "^4.7.0",
+    "eslint-plugin-react-doctor": "^0.9.14",
+    "oxlint": "^1.85.0",
+    "oxlint-tsgolint": ">=7.0.2003",
+    "typescript": ">=5.0.0 <6.1.0"
+  },
+  "peerDependenciesMeta": {
+    "eslint-plugin-better-tailwindcss": {
+      "optional": true
+    },
+    "eslint-plugin-react-doctor": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@inflexa-ai/oxlint-plugin": "^0.1.0",
+    "@tanstack/eslint-plugin-query": "^5.103.2",
+    "@tanstack/eslint-plugin-router": "^1.162.0",
+    "@typescript-eslint/utils": "^8.70.1",
+    "eslint-plugin-playwright": "^2.12.0",
+    "eslint-plugin-testing-library": "^7.16.2"
+  },
+  "devDependencies": {
+    "@tanstack/query-core": "^5.103.2",
+    "@tanstack/react-query": "^5.103.2",
+    "eslint-plugin-better-tailwindcss": "^4.7.0",
+    "eslint-plugin-react-doctor": "^0.9.14",
+    "react": "^19.2.0"
+  }
+}

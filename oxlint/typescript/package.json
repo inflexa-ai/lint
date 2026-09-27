@@ -1,0 +1,73 @@
+{
+  "name": "@inflexa-ai/oxlint-plugin",
+  "version": "0.1.0",
+  "description": "The oxlint rules and configuration of Inflexa for TypeScript, and the ESLint configuration of its typed rules.",
+  "keywords": [
+    "oxlint",
+    "oxlint-plugin",
+    "eslint",
+    "eslintplugin",
+    "eslint-plugin",
+    "typescript"
+  ],
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/inflexa-ai/lint.git",
+    "directory": "oxlint/typescript"
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./plugin": {
+      "source": "./src/js-plugin.ts",
+      "types": "./dist/js-plugin.d.ts",
+      "default": "./dist/js-plugin.js"
+    },
+    "./eslint": {
+      "source": "./src/eslint.ts",
+      "types": "./dist/eslint.d.ts",
+      "default": "./dist/eslint.js"
+    },
+    "./helpers/*": {
+      "source": "./src/helpers/*.ts",
+      "types": "./dist/helpers/*.d.ts",
+      "default": "./dist/helpers/*.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "inflexa-architecture-directives": "./dist/directives/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json --removeComments --declaration false && tsc -p tsconfig.build.json --emitDeclarationOnly",
+    "prepublishOnly": "echo \"Publish through scripts/release.mjs at the root of the workspace, which stages a clean package.\" && exit 1",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "eslint": "^10.0.0",
+    "oxlint": "^1.85.0",
+    "oxlint-tsgolint": ">=7.0.2003",
+    "typescript": ">=5.0.0 <6.1.0"
+  },
+  "dependencies": {
+    "@typescript-eslint/utils": "^8.70.1",
+    "oxlint-plugin-eslint": "^1.85.0",
+    "typescript-eslint": "^8.70.1"
+  },
+  "devDependencies": {
+    "globals": "^17.12.0",
+    "zod": "^4.6.5"
+  }
+}

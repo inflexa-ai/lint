@@ -1,0 +1,35 @@
+name: Release golint
+
+# Tags the Go lint module when golint/VERSION changes on main.
+# golint/scripts/release.sh does the work, the same script that a person runs
+# locally: it checks the module, and it does nothing when the tag exists, thus
+# a re-run through workflow_dispatch is safe. The tag is golint/vX.Y.Z, and
+# `go get` names the version as vX.Y.Z.
+on:
+  push:
+    branches: [main]
+    paths:
+      - golint/VERSION
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-golint
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: golint/go.mod
+          cache-dependency-path: golint/go.sum
+      - name: Release
+        run: golint/scripts/release.sh --push

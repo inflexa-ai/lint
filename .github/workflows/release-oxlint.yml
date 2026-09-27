@@ -1,0 +1,53 @@
+name: Release oxlint packages
+
+# Publishes @inflexa-ai/oxlint-plugin and @inflexa-ai/oxlint-plugin-react when
+# their shared version changes on main. oxlint/scripts/release.mjs does the
+# work, the same script that a person runs locally: it skips each version that
+# npm already has, thus a re-run through workflow_dispatch is safe.
+#
+# Auth is npm trusted publishing (OIDC). npm accepts a trusted publisher only
+# for a package that exists, thus the first release of each package is local.
+# npmjs.com must then trust this repository and this workflow file for each
+# package, and a rename of this file breaks that binding. The script writes
+# the `repository.url` of the source manifest into the staged manifest, because
+# trusted publishing requires it.
+on:
+  push:
+    branches: [main]
+    paths:
+      - oxlint/typescript/package.json
+      - oxlint/react/package.json
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Never cancel a run that can sit between a publish and the tag.
+concurrency:
+  group: release-oxlint
+  cancel-in-progress: false
+
+jobs:
+  release:
+    # workflow_dispatch can run from any branch; npm gets only what main holds.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      # Trusted publishing needs npm 11.5.1 or later, which Node 24 ships. No
+      # registry-url: it writes an .npmrc that reads NODE_AUTH_TOKEN, and npm
+      # fails on the unset variable.
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: oxlint/package-lock.json
+      - name: npm ci
+        working-directory: oxlint
+        run: npm ci
+      - name: Release
+        working-directory: oxlint
+        run: node scripts/release.mjs --publish

@@ -1,0 +1,49 @@
+name: Test
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Format, lint and test at oxlint/
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: oxlint/package-lock.json
+      - name: npm ci
+        working-directory: oxlint
+        run: npm ci
+      - name: npm run format:check
+        working-directory: oxlint
+        run: npm run format:check
+      - name: npm run lint
+        working-directory: oxlint
+        run: npm run lint
+      - name: npm test
+        working-directory: oxlint
+        run: npm test
+  golint:
+    name: Format, vet and test at golint/
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: golint/go.mod
+          cache-dependency-path: golint/go.sum
+      - name: gofmt -l
+        working-directory: golint
+        run: test -z "$(gofmt -l .)"
+      - name: go vet
+        working-directory: golint
+        run: go vet ./...
+      - name: go test
+        working-directory: golint
+        run: go test -count=1 ./...
