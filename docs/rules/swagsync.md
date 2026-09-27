@@ -19,7 +19,7 @@ The rule exports a fact on each function with an `@Router` line. Thus the regist
 - A handler that is a function literal or a variable.
 - A status that a helper writes, for example the `400` of `MustDecodeBody`. The rule sees only the constants inside the handler.
 
-The base configuration applies the rule to `handler/`, and skips test files.
+The base configuration skips test files. With no `register-methods`, the rule checks only the statuses of each function that has an `@Router` line.
 
 ## Settings
 

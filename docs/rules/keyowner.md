@@ -20,7 +20,7 @@ The message names the owner package.
 - An expression that is not constant, for example `"iam_" + name`.
 - Import paths and struct tags.
 
-The base configuration holds no key. A repository lists its keys in its overlay. It adds one entry for each literal prefix of its key builders, and one entry for each queue name.
+The base configuration holds no key, and it does not turn on the rule. A repository turns on the rule and lists its keys in its overlay. It adds one entry for each literal prefix of its key builders, and one entry for each queue name.
 
 ## Settings
 

@@ -66,7 +66,11 @@ func fixture(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	files, err := config.Render(dir, "example.com/fixture", nil)
+	overlay, err := os.ReadFile(filepath.Join(dir, config.OverlayFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	files, err := config.Render(dir, "example.com/fixture", overlay)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,8 +124,8 @@ func TestRunOnTheFixture(t *testing.T) {
 	if out, err := command(t, dir, "go", "mod", "tidy", "-diff"); err != nil {
 		t.Fatalf("go mod tidy -diff with %s in place: %v\n%s", config.RulesFile, err, out)
 	}
-	if out, err := command(t, dir, "go", "list", "-e", "-f", "{{.IgnoredGoFiles}}", "./golangci"); err != nil || strings.TrimSpace(out) != "[rules.go]" {
-		t.Errorf("go list of ./golangci: %v, output %q; want [rules.go]", err, out)
+	if out, err := command(t, dir, "go", "list", "-e", "-f", "{{.IgnoredGoFiles}}", "./golangci"); err != nil || strings.TrimSpace(out) != "[local_rules.go rules.go]" {
+		t.Errorf("go list of ./golangci: %v, output %q; want [local_rules.go rules.go]", err, out)
 	}
 	if out, err := command(t, dir, lintBinary(t), "version"); err != nil || !strings.Contains(out, "+golint.(devel)") {
 		t.Errorf("inflexa-lint version: %v, output %q; want +golint.(devel)", err, out)

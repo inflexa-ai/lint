@@ -17,7 +17,7 @@ The rule reads file names only.
 - A test file in the `tests-dir` folder.
 - A test file whose name ends with `internal-suffix`.
 
-The base configuration applies the rule to `modules/` only. `kernel/` and `provider/` keep their unit tests beside the code.
+The base configuration does not turn on the rule, because the Go convention keeps a test beside the code. A repository that keeps its black-box tests in a folder turns on the rule in its overlay. An exclusion rule of the overlay limits the rule to the folders of that repository.
 
 ## Settings
 

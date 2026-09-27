@@ -51,8 +51,8 @@ function withoutSource(exports) {
 }
 
 /**
- * Whether npm already has this version of the package. It asks for the document of the version, not `npm view`: the
- * registry CDN keeps serving a 404 for the document of a new package for minutes after its first publish.
+ * Whether npm already has this version of the package. The registry can answer 404 for minutes after a publish, thus the
+ * loop below trusts the exit status of `npm publish`, and this check decides only whether an attempt is necessary.
  */
 async function published(name, version) {
   const response = await fetch(`https://registry.npmjs.org/${name.replace('/', '%2f')}/${version}`)

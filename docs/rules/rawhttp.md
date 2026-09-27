@@ -25,4 +25,4 @@ The base configuration skips test files.
 - `client-packages` — the import path prefixes of the packages that can build an `http.Client`. Default: none.
 - `body-packages` — the import path prefixes of the packages that can read a request body. Default: none.
 
-The base configuration approves `handler/request` for bodies and no package for clients. An overlay can add a package.
+The base configuration does not turn on the rule, because the rule needs the approved packages of the repository. A repository turns on the rule in its overlay, together with its `client-packages` and `body-packages`.

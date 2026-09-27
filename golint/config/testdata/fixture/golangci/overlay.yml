@@ -1,0 +1,35 @@
+# The local choices of the fixture, as a repository writes them. inflexa-lint-config
+# substitutes {{module}} in the base only, thus each path here is literal.
+linters:
+  enable:
+    - typedids
+    - keyowner
+    - rawhttp
+    - testplacement
+  settings:
+    gocritic:
+      settings:
+        ruleguard:
+          rules: ${config-path}/golangci/rules.go,${config-path}/golangci/local_rules.go
+    depguard:
+      rules:
+        kernel:
+          list-mode: lax
+          files:
+            - ${base-path}/kernel/**
+          deny:
+            - pkg: example.com/fixture/modules
+              desc: kernel is the lowest layer; move the shared type into kernel
+    custom:
+      typedids:
+        settings:
+          ids-package: example.com/fixture/kernel/ids
+  exclusions:
+    rules:
+      - path-except: ^modules/
+        linters:
+          - testplacement
+      - path-except: ^handler/
+        linters:
+          - gocritic
+        text: "ruleguard: parse a path ID"

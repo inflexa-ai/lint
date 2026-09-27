@@ -21,5 +21,5 @@ The rule needs no import path from the analyzed package to the typed ID package.
 
 ## Settings
 
-- `ids-package` — the import path of the typed ID package. The message uses its package name. Default: none.
+- `ids-package` — the import path of the typed ID package. The message uses its package name. Default: none. The base configuration does not turn on the rule. A repository turns it on in its overlay, together with this setting.
 - `names` — the typed ID names. Default: none. `inflexa-lint-config` writes this setting. It loads `ids-package` from the repository, and it uses each type name of that package with the underlying type `[16]byte`. When the package does not load, `inflexa-lint-config` stops with an error. The plugin loads no package.

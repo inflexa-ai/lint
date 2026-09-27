@@ -20,7 +20,7 @@ A parameter, a result or a field of type `any` or `map[string]any` tells the cal
 - A method of `exempt-methods`, for example `Scan` of `sql.Scanner`.
 - A type parameter with the constraint `any`.
 
-The base configuration skips `kernel/types/`, which declares the named map types. It also skips test files, because a test function is not an exported API.
+The base configuration skips test files, because a test function is not an exported API. A repository that declares its named map types in one package can skip that package in its overlay.
 
 ## Settings
 

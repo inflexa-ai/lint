@@ -2,8 +2,8 @@ package config_test
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 
@@ -13,6 +13,17 @@ import (
 )
 
 var fixtureDir = filepath.Join("testdata", "fixture")
+
+// fixtureOverlay is the overlay of the fixture, which holds the local choices
+// of a repository, as the typed ID package and the layer rules.
+func fixtureOverlay(t *testing.T) string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(fixtureDir, config.OverlayFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
+}
 
 func render(t *testing.T, overlay string) (string, string) {
 	t.Helper()
@@ -27,7 +38,7 @@ func render(t *testing.T, overlay string) (string, string) {
 }
 
 func TestRenderFirstRun(t *testing.T) {
-	cfg, rules := render(t, "")
+	cfg, rules := render(t, fixtureOverlay(t))
 	for name, text := range map[string]string{config.ConfigFile: cfg, config.RulesFile: rules} {
 		first, _, _ := strings.Cut(text, "\n")
 		if !strings.Contains(first, "inflexa-lint-config") {
@@ -54,8 +65,8 @@ func TestRenderFirstRun(t *testing.T) {
 	if typedids["ids-package"] != "example.com/fixture/kernel/ids" || fmt.Sprint(typedids["names"]) != "[UserID]" {
 		t.Errorf("typedids settings = %v, want the ids-package of the module and names [UserID]", typedids)
 	}
-	if !strings.Contains(rules, "\n//go:build ruleguard\n") || !strings.Contains(rules, "example.com/fixture/kernel/conc") {
-		t.Errorf("the rules file lacks the build tag or the module path:\n%s", rules)
+	if !strings.Contains(rules, "\n//go:build ruleguard\n") || !strings.Contains(rules, "decimal.NewFromFloat") {
+		t.Errorf("the rules file lacks the build tag or the patterns of the base:\n%s", rules)
 	}
 	if strings.Index(rules, "//go:build ruleguard") > strings.Index(rules, "package gorules") {
 		t.Error("the build tag must come before the package clause")
@@ -155,15 +166,17 @@ func TestRenderBaseHoldsNoRepositoryFact(t *testing.T) {
 	if clients, ok := custom["rawhttp"].Settings["client-packages"]; ok {
 		t.Errorf("rawhttp client-packages = %v, want none", clients)
 	}
-	belowCmd := regexp.MustCompile(`(^|[^a-z])cmd/[^|)]`)
 	paths := doc.Linters.Exclusions.Paths
 	for _, rule := range doc.Linters.Exclusions.Rules {
 		paths = append(paths, rule.Path, rule.PathExcept)
 	}
 	for _, path := range paths {
-		if belowCmd.MatchString(path) {
-			t.Errorf("the exclusion path %q names a directory below cmd/", path)
+		if path != "" && path != `_test\.go` && path != `^cmd/` {
+			t.Errorf("the exclusion path %q names a folder of one repository", path)
 		}
+	}
+	if strings.Contains(cfg, "example.com/fixture/") {
+		t.Error("the base names a package of the module; only the overlay of a repository can")
 	}
 }
 
@@ -178,5 +191,18 @@ func TestRenderTypedIDPackageThatDoesNotLoad(t *testing.T) {
 	_, err := config.Render(fixtureDir, "example.com/fixture", []byte(overlay))
 	if err == nil || !strings.Contains(err.Error(), "example.com/fixture/kernel/absent") {
 		t.Errorf("error %v, want one that names the typed ID package", err)
+	}
+}
+
+func TestRenderPlainModule(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example.com/plain\n\ngo 1.26\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "plain.go"), []byte("package plain\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := config.Render(dir, "example.com/plain", nil); err != nil {
+		t.Errorf("Render of a module with none of the folders of another repository: %v", err)
 	}
 }

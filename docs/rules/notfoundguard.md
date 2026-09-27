@@ -34,14 +34,14 @@ The fix for the second report is a 500 answer with a constant message, and a log
 ## What the rule leaves alone
 
 - A call with no error test, for example a 404 after an ownership check such as `if mount.ProjectID != projectID`.
-- A guarded call, for example a 404 under `if pgerr.IsNotFound(err)`, or under `case errors.Is(err, ErrNotFound):` inside `if err != nil`.
+- A guarded call, for example a 404 under a configured guard such as `if store.IsNotFound(err)`, or under `case errors.Is(err, ErrNotFound):` inside `if err != nil`.
 - A validation answer: a 400 in an error test whose block has no guard branch, for example after `uuid.Parse`.
 - `Error()` on a value of a concrete type, for example the value that `errors.As` narrowed.
 
-The analyzer knows no path. The base configuration applies it to `handler/` only.
+The analyzer knows no path, thus it reads each package. It reports only a `http.StatusNotFound` inside an error test, which an HTTP handler writes.
 
 ## Settings
 
 - `guards` — more guard functions, as `<import path>.<name>`. `errors.Is` and `errors.As` are always guards. Default: none.
 
-The base configuration names `kernel/pgerr.IsNotFound` as a guard. It is a transition guard. depguard denies the import of `kernel/pgerr` in `handler/`, and a handler must match the sentinels of its module. Until the handlers move to those sentinels, `notfoundguard` accepts the call.
+The base configuration names no guard. A repository adds its guards in its overlay.

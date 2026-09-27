@@ -37,8 +37,8 @@ this module:
   and the names of the typed IDs of the repository for `typedids`.
 - `golangci/rules.go`, the ruleguard patterns that gocritic loads.
 
-`inflexa-lint-config` loads the typed ID package of the repository, and
-writes the names into `.golangci.yml`. The names are part of the key of the
+When the overlay sets the `ids-package` of `typedids`, `inflexa-lint-config`
+loads that package and writes its names into `.golangci.yml`. The names are part of the key of the
 lint cache, thus a new typed ID makes golangci-lint analyze each package again.
 Run `inflexa-lint-config` again after a change of the typed IDs.
 
@@ -51,6 +51,28 @@ exclusion rules. The overlay merges into the base with these rules:
 - Each other value of the overlay replaces the value of the base.
 
 An overlay cannot remove an entry of the base.
+
+The base holds only the rules that apply to each Go module. The analyzers
+`typedids`, `keyowner`, `rawhttp` and `testplacement` need the facts of a
+repository, thus the base does not turn them on. An overlay turns each one on
+with its settings:
+
+```yaml
+linters:
+  enable:
+    - typedids
+  settings:
+    custom:
+      typedids:
+        settings:
+          ids-package: example.com/svc/kernel/ids
+```
+
+The overlay gets no `{{module}}` substitution, thus each path in it is
+literal. The depguard layers, the exclusion paths and the ruleguard patterns of
+a repository go into the overlay too. A second ruleguard file joins the file of
+the base through the `rules` setting of gocritic, as in
+`${config-path}/golangci/rules.go,${config-path}/golangci/local_rules.go`.
 
 ```sh
 go tool -modfile=tools/go.mod inflexa-lint-config
