@@ -41,7 +41,7 @@
     "./package.json": "./package.json"
   },
   "bin": {
-    "inflexa-architecture-directives": "./dist/directives/cli.js"
+    "inflexa-architecture-directives": "dist/directives/cli.js"
   },
   "files": [
     "dist"

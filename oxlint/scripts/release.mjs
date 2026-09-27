@@ -50,9 +50,15 @@ function withoutSource(exports) {
   )
 }
 
-/** Whether npm already has this version of the package. */
-function published(name, version) {
-  return capture('npm', ['view', `${name}@${version}`, 'version']).status === 0
+/**
+ * Whether npm already has this version of the package. It asks for the document of the version, not `npm view`: the
+ * registry CDN keeps serving a 404 for the document of a new package for minutes after its first publish.
+ */
+async function published(name, version) {
+  const response = await fetch(`https://registry.npmjs.org/${name.replace('/', '%2f')}/${version}`)
+  if (response.status === 404) return false
+  if (!response.ok) fail(`the registry answered ${String(response.status)} for ${name}@${version}`)
+  return true
 }
 
 function sleep(seconds) {
@@ -170,13 +176,14 @@ for (const { name, target } of staged) {
   // A PUT that failed on this side can still land on the registry, thus each
   // attempt asks the registry first.
   for (let attempt = 1; ; attempt++) {
-    if (published(name, version)) {
+    if (await published(name, version)) {
       console.log(`release: ${name}@${version} is on npm`)
       break
     }
     if (attempt > 3) fail(`${name}@${version} did not publish after 3 attempts`)
     console.log(`release: publish ${name}@${version} (attempt ${String(attempt)} of 3)`)
-    if (spawnSync('npm', ['publish'], { cwd: target, stdio: 'inherit' }).status !== 0) sleep(30 * attempt)
+    if (spawnSync('npm', ['publish'], { cwd: target, stdio: 'inherit' }).status === 0) break
+    sleep(30 * attempt)
   }
 }
 
