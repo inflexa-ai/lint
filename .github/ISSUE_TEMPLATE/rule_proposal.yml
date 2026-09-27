@@ -1,0 +1,48 @@
+name: ✨ Rule proposal
+description: Propose a new rule, or a change to a rule.
+labels: ["enhancement"]
+body:
+  - type: checkboxes
+    attributes:
+      label: Before you propose
+      options:
+        - label: I searched the [issues](../../issues) and the [discussions](../../discussions), and I did not find a duplicate.
+          required: true
+  - type: dropdown
+    id: language
+    attributes:
+      label: Language
+      options:
+        - TypeScript
+        - React
+        - Go
+    validations:
+      required: true
+  - type: textarea
+    id: principle
+    attributes:
+      label: Principle
+      description: The principle that the rule enforces, and why it is important.
+    validations:
+      required: true
+  - type: textarea
+    id: bad
+    attributes:
+      label: Code that breaks the principle
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: good
+    attributes:
+      label: Correct code
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: An existing rule or a tool that can do the same work, and why it is not sufficient.
+    validations:
+      required: false

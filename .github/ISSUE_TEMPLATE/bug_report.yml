@@ -1,0 +1,65 @@
+name: 🐞 Bug report
+description: Report a false positive, a false negative, or a crash of a rule or a tool.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not put private code or secrets into this report. Make a minimal sample instead.
+
+        For a security vulnerability, **stop** and obey [`SECURITY.md`](https://github.com/inflexa-ai/lint/blob/main/SECURITY.md). Do not report it here.
+  - type: checkboxes
+    attributes:
+      label: Before you report
+      options:
+        - label: I searched the [issues](../../issues) and the [discussions](../../discussions), and I did not find a duplicate.
+          required: true
+        - label: This is not a security vulnerability.
+          required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind of bug
+      options:
+        - False positive (the rule reports correct code)
+        - False negative (the rule does not report code that breaks its principle)
+        - Crash or wrong output of a tool
+        - Other (tell in the description)
+    validations:
+      required: true
+  - type: input
+    id: rule
+    attributes:
+      label: Rule
+      description: The rule ID, for example `@inflexa-ai/no-interface` or `blankerr`.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Package and version
+      description: The npm package and its version, or the version of the Go module.
+    validations:
+      required: true
+  - type: textarea
+    id: sample
+    attributes:
+      label: Minimal code sample
+      description: The smallest code that shows the bug.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Output
+      description: The output of the linter. Remove the secrets and the private data.
+      render: shell
+    validations:
+      required: false

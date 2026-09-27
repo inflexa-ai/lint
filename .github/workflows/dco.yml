@@ -1,0 +1,23 @@
+name: DCO
+
+# Each commit in a PR must carry a `Signed-off-by:` trailer that matches its
+# author (see CONTRIBUTING.md). The action skips merge commits, and the bot
+# allowlist exempts Dependabot, whose commits cannot carry a sign-off. The job
+# always runs, so it reports a real result as a required status check.
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  dco:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: KineticCafe/actions-dco@5f160e3ee086af8fc0fb567b8add0937d074123e # v3.2.0
+        with:
+          config: |
+            [bot]
+            policy = "allowlist"
+            allow = ["dependabot[bot]"]
