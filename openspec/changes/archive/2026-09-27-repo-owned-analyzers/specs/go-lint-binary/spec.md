@@ -1,9 +1,6 @@
-# go-lint-binary Specification
+# Spec Delta
 
-## Purpose
-`inflexa-lint` is golangci-lint with the Go analyzers of Inflexa compiled in, so that one binary runs the built-in linters and the company rules, and a change of any rule in the binary invalidates the lint cache.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: inflexa-lint is golangci-lint with the plugins
 

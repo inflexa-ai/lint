@@ -127,8 +127,8 @@ func TestRunOnTheFixture(t *testing.T) {
 	if out, err := command(t, dir, "go", "list", "-e", "-f", "{{.IgnoredGoFiles}}", "./golangci"); err != nil || strings.TrimSpace(out) != "[local_rules.go rules.go]" {
 		t.Errorf("go list of ./golangci: %v, output %q; want [local_rules.go rules.go]", err, out)
 	}
-	if out, err := command(t, dir, lintBinary(t), "version"); err != nil || !strings.Contains(out, "+golint.(devel)") {
-		t.Errorf("inflexa-lint version: %v, output %q; want +golint.(devel)", err, out)
+	if out, err := command(t, dir, lintBinary(t), "version"); err != nil || !regexp.MustCompile(`\+golint\.\(devel\)\+bin\.[0-9a-f]{16}`).MatchString(out) {
+		t.Errorf("inflexa-lint version: %v, output %q; want +golint.(devel)+bin. and 16 hex characters", err, out)
 	}
 	out, err := command(t, dir, lintBinary(t), "run", "--allow-serial-runners",
 		"--output.text.colors=false", "--output.text.print-issued-lines=false", "--show-stats=false",
