@@ -1,0 +1,9 @@
+# The local choices of the fixture, as a repository writes them. Each path is
+# literal; inflexa-lint-config substitutes the module path in the base only.
+linters:
+  enable:
+    - localrule
+  settings:
+    custom:
+      localrule:
+        type: module

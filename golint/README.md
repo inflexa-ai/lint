@@ -25,9 +25,14 @@ go get -modfile=tools/go.mod -tool github.com/inflexa-ai/lint/golint/cmd/inflexa
 
 The separate file keeps the dependencies of golangci-lint out of the `go.mod`
 of the repository. `go tool -modfile=tools/go.mod inflexa-lint version` prints
-the two versions, for example `v2.14.0+golint.v0.1.0`. golangci-lint uses this
-string in the key of its cache, thus a new release of the rules clears the old
-issues.
+the version string, for example `v2.14.0+golint.v0.1.0+bin.1a2b3c4d5e6f7089`.
+The string has three segments: the version of golangci-lint, the version of
+this module, and a fingerprint of the executable file. The fingerprint is the
+first 16 hex characters of SHA-256 of the file.
+
+golangci-lint uses the whole string in the key of its cache. Thus a change of
+any rule, in this module or in the repository, clears the old issues, and an
+unchanged binary keeps its cache.
 
 golangci-lint reads one configuration file, and it has no `extends`. Thus
 `inflexa-lint-config` writes two files into the repository from the base in
@@ -98,6 +103,108 @@ if strings.Contains(err.Error(), "not a member") { //nolint:errtext // the modul
 
 nolintlint rejects a directive with no reason, and a directive that suppresses
 nothing.
+
+## Add the analyzers of the repository
+
+A repository adds its own Go rules to the lint run. The rules, their plugin
+package, and the `main` package are in the tools module. The fixture
+[`lintmain/testdata/consumer/`](lintmain/testdata/consumer/) has this layout.
+The test of `lintmain` proves the steps and the cache rule.
+
+Put each rule in its own package under `tools/lint/rules/`, for example
+`tools/lint/rules/localrule/`. A rule is a `go/analysis` analyzer. Give each
+rule an `analysistest` test in a `_test.go` file beside the analyzer. The test
+data of a rule goes into its `testdata` folder. A `go.mod` in that folder puts
+`analysistest` in module mode. The test names the package by its path in the
+tools module:
+
+```go
+func TestAnalyzer(t *testing.T) {
+	analysistest.Run(t, analysistest.TestData(), localrule.New(),
+		"example.com/svc/tools/lint/rules/localrule/testdata")
+}
+```
+
+Put a plugin package beside the rules, for example `tools/lint/plugin/`. It
+registers each rule with its name, as [`plugin/plugin.go`](plugin/plugin.go)
+of this module registers the rules of this module. The fixture gives the full
+package:
+
+```go
+package plugin
+
+import (
+	"github.com/golangci/plugin-module-register/register"
+	"golang.org/x/tools/go/analysis"
+
+	"example.com/svc/tools/lint/rules/localrule"
+)
+
+func init() {
+	register.Plugin("localrule", func(settings any) (register.LinterPlugin, error) {
+		return linter{analyzer: localrule.New(), mode: register.LoadModeSyntax}, nil
+	})
+}
+
+type linter struct {
+	analyzer *analysis.Analyzer
+	mode     string
+}
+
+func (l linter) BuildAnalyzers() ([]*analysis.Analyzer, error) {
+	return []*analysis.Analyzer{l.analyzer}, nil
+}
+
+func (l linter) GetLoadMode() string { return l.mode }
+```
+
+Put the `main` package in `tools/lint/cmd/`, for example
+`tools/lint/cmd/svc-lint/`. It imports the plugin package of this module and
+the plugin packages of the repository, and it calls `lintmain.Run`:
+
+```go
+package main
+
+import (
+	_ "example.com/svc/tools/lint/plugin"
+	_ "github.com/inflexa-ai/lint/golint/plugin"
+
+	"github.com/inflexa-ai/lint/golint/lintmain"
+)
+
+func main() {
+	lintmain.Run()
+}
+```
+
+Declare each rule in `golangci/overlay.yml`, and turn it on. The name of the
+`custom` entry is the name of the registration:
+
+```yaml
+linters:
+  enable:
+    - localrule
+  settings:
+    custom:
+      localrule:
+        type: module
+```
+
+Put this module and `plugin-module-register` into the tools module. Do a test
+of the rules. Then build the tool. Then run the lint:
+
+```sh
+go get -C tools github.com/inflexa-ai/lint/golint github.com/golangci/plugin-module-register
+go test -C tools ./lint/rules/...
+go build -C tools -o ../svc-lint ./lint/cmd/svc-lint
+./svc-lint run ./...
+```
+
+The version string of the binary ends with a fingerprint: the first 16 hex
+characters of SHA-256 of the executable file. golangci-lint uses the whole
+string in the key of its cache. Thus a change of a rule clears the cached
+issues, and an unchanged binary keeps its cache. The hash of a 60 MB binary
+takes about 30 ms.
 
 Run each command of the module from this folder:
 

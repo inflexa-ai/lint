@@ -1,0 +1,41 @@
+// Package localrule is the local rule of the consumer fixture. This variant
+// flags V2Call; the test of lintmain overwrites localrule.go with this file.
+package localrule
+
+import (
+	"go/ast"
+
+	"golang.org/x/tools/go/analysis"
+)
+
+const (
+	name        = "localrule"
+	flaggedCall = "V2Call"
+)
+
+func New() *analysis.Analyzer {
+	return &analysis.Analyzer{
+		Name: name,
+		Doc:  "reports the calls of " + flaggedCall + " in the module under lint",
+		Run: func(pass *analysis.Pass) (any, error) {
+			for _, file := range pass.Files {
+				ast.Inspect(file, func(n ast.Node) bool {
+					call, ok := n.(*ast.CallExpr)
+					if !ok {
+						return true
+					}
+					sel, ok := call.Fun.(*ast.SelectorExpr)
+					if !ok {
+						return true
+					}
+					if sel.Sel.Name != flaggedCall {
+						return true
+					}
+					pass.Reportf(call.Pos(), "the rule of this run flags "+flaggedCall)
+					return true
+				})
+			}
+			return nil, nil
+		},
+	}
+}
