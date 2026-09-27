@@ -1,15 +1,16 @@
 import type { TSESLint, TSESTree } from '@typescript-eslint/utils'
 import { AST_NODE_TYPES } from '@typescript-eslint/utils'
 
-const isTypeWrapper = (node: TSESTree.Node) =>
-  node.type === AST_NODE_TYPES.TSAsExpression ||
-  node.type === AST_NODE_TYPES.TSSatisfiesExpression ||
-  node.type === AST_NODE_TYPES.TSNonNullExpression ||
-  node.type === AST_NODE_TYPES.TSTypeAssertion
-
 function unwrap(node: TSESTree.Expression): TSESTree.Expression {
   let current = node
-  while (isTypeWrapper(current)) current = current.expression
+  while (
+    current.type === AST_NODE_TYPES.TSAsExpression ||
+    current.type === AST_NODE_TYPES.TSSatisfiesExpression ||
+    current.type === AST_NODE_TYPES.TSNonNullExpression ||
+    current.type === AST_NODE_TYPES.TSTypeAssertion
+  ) {
+    current = current.expression
+  }
   return current
 }
 

@@ -18,6 +18,8 @@ ruleTester.run('no-unknown-parameters', noUnknownParameters, {
     // A generic parameter is not unknown.
     `function first<T>(value: T): T { return value }`,
     `function save(user: User, meta: RequestMeta) {}`,
+    // A parameter with no annotation declares nothing.
+    `function save(value) {}`,
   ],
   invalid: [
     { code: `function save(value: unknown) {}`, errors: [unknownParameter('value')] },
@@ -42,6 +44,9 @@ ruleTester.run('no-unknown-returns', noUnknownReturns, {
     // A type parameter shadows a module alias of the same name.
     `type Raw = unknown\nfunction pass<Raw>(value: Raw): Raw { return value }`,
     `function tag(): string { return '' }`,
+    // A function with no return type declares nothing.
+    `export const f = () => 1`,
+    `function load() { return 1 }`,
   ],
   invalid: [
     { code: `function load(): unknown { return 1 }`, errors: [unknownReturn] },

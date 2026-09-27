@@ -18,3 +18,12 @@ test('a repository applies the vitest preset to its test files', () => {
 test('without the preset the configuration names no vitest rule', () => {
   expect(JSON.stringify(typescript())).not.toContain('vitest/')
 })
+
+test('a function outside the tests declares its return type', () => {
+  const [source, , tests] = typescript().overrides ?? []
+
+  expect(source.files).toEqual(['**/*.{ts,tsx}'])
+  expect(source.rules).toMatchObject({ 'typescript/explicit-function-return-type': ['error', { allowExpressions: true, allowTypedFunctionExpressions: true }] })
+  expect(tests.files).toEqual(['**/*.test.{ts,tsx,js}'])
+  expect(tests.rules).toMatchObject({ 'typescript/explicit-function-return-type': 'off' })
+})

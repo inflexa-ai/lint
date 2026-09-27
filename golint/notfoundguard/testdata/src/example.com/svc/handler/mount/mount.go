@@ -325,3 +325,114 @@ func CallAndIndexTests(w http.ResponseWriter, r result, errs []error, i int) {
 		response.WriteError(w, http.StatusNotFound, "mount not found") // want `a 404 answer must follow a check of the error kind`
 	}
 }
+
+type NotFoundError struct{}
+
+func (*NotFoundError) Error() string { return "not found" }
+
+func lookup(err error) (string, bool) { return "", false }
+
+func AsTypeInit(w http.ResponseWriter, id string) {
+	_, err := get(id)
+	if err != nil {
+		if _, ok := errors.AsType[*NotFoundError](err); ok {
+			response.WriteError(w, http.StatusNotFound, "not found")
+			return
+		}
+		response.WriteError(w, http.StatusInternalServerError, "failed")
+	}
+}
+
+func AsTypeInitNegated(w http.ResponseWriter, id string) {
+	_, err := get(id)
+	if err != nil {
+		if _, ok := errors.AsType[*NotFoundError](err); !ok {
+			response.WriteError(w, http.StatusNotFound, "not found") // want `a 404 answer must follow a check of the error kind`
+		} else {
+			response.WriteError(w, http.StatusNotFound, "not found")
+		}
+	}
+}
+
+func IsInit(w http.ResponseWriter, id string) {
+	_, err := get(id)
+	if err != nil {
+		if ok := errors.Is(err, ErrNotFound); ok {
+			response.WriteError(w, http.StatusNotFound, "not found")
+		}
+	}
+}
+
+func InitNotGuard(w http.ResponseWriter, id string) {
+	_, err := get(id)
+	if err != nil {
+		if _, ok := lookup(err); ok {
+			response.WriteError(w, http.StatusNotFound, "not found") // want `a 404 answer must follow a check of the error kind`
+		}
+	}
+}
+
+func InitGuardOfOtherError(w http.ResponseWriter, id string) {
+	_, err := get(id)
+	var other error
+	if err != nil {
+		if _, ok := errors.AsType[*NotFoundError](other); ok {
+			response.WriteError(w, http.StatusNotFound, "not found") // want `a 404 answer must follow a check of the error kind`
+		}
+	}
+}
+
+func AsTypeFallback(w http.ResponseWriter, id string) {
+	_, err := get(id)
+	if err != nil {
+		if escalation, ok := errors.AsType[*AccessModeEscalationError](err); ok {
+			response.WriteError(w, http.StatusUnprocessableEntity, escalation.Error())
+			return
+		}
+		response.WriteError(w, http.StatusBadRequest, err.Error()) // want `a fallback 4xx answer carries the text of an unclassified error`
+	}
+}
+
+func SwitchInitGuard(w http.ResponseWriter, id string) {
+	_, err := get(id)
+	if err != nil {
+		switch _, ok := errors.AsType[*NotFoundError](err); {
+		case ok:
+			response.WriteError(w, http.StatusNotFound, "not found")
+		default:
+			response.WriteError(w, http.StatusInternalServerError, "failed")
+		}
+	}
+}
+
+func SwitchInitNotGuard(w http.ResponseWriter, id string) {
+	_, err := get(id)
+	if err != nil {
+		switch _, ok := lookup(err); {
+		case ok:
+			response.WriteError(w, http.StatusNotFound, "not found") // want `a 404 answer must follow a check of the error kind`
+		}
+	}
+}
+
+func SwitchInitTag(w http.ResponseWriter, id string, flag bool) {
+	_, err := get(id)
+	if err != nil {
+		switch _, ok := errors.AsType[*NotFoundError](err); flag {
+		case ok:
+			response.WriteError(w, http.StatusNotFound, "not found") // want `a 404 answer must follow a check of the error kind`
+		}
+	}
+}
+
+func SwitchInitFallback(w http.ResponseWriter, id string) {
+	_, err := get(id)
+	if err != nil {
+		switch escalation, ok := errors.AsType[*AccessModeEscalationError](err); {
+		case ok:
+			response.WriteError(w, http.StatusUnprocessableEntity, escalation.Error())
+			return
+		}
+		response.WriteError(w, http.StatusBadRequest, err.Error()) // want `a fallback 4xx answer carries the text of an unclassified error`
+	}
+}

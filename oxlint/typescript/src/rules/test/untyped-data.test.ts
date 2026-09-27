@@ -19,6 +19,8 @@ ruleTester.run('no-unknown-type-guards', noUnknownTypeGuards, {
     `const schema = z.object({ message: z.string() })`,
     // Declaring a guard's type is not writing one.
     `type Guard<T> = (value: unknown) => value is T`,
+    // A function with no return type makes no claim.
+    `function check(value: unknown) { return value != null }`,
   ],
   invalid: [
     {

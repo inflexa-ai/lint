@@ -22,20 +22,21 @@ const (
 	doc  = `answer 404 only for an error that a check classified as not found
 
 A call that passes http.StatusNotFound inside an error test (err != nil)
-must sit under errors.Is, errors.As or a configured guard on that error.
+must sit under errors.Is, errors.As, errors.AsType or a configured guard on
+that error.
 Otherwise a database outage looks like a missing resource. A 4xx answer
 after the guard branches must not carry the text of the unclassified error,
 because internal messages then reach the client.`
 )
 
 // Settings configures the analyzer. Guards holds more guard functions as
-// "<import path>.<name>", beside errors.Is and errors.As.
+// "<import path>.<name>", beside errors.Is, errors.As and errors.AsType.
 type Settings struct {
 	Guards []string `json:"guards"`
 }
 
 func New(s Settings) *analysis.Analyzer {
-	guards := map[string]bool{"errors.Is": true, "errors.As": true}
+	guards := map[string]bool{"errors.Is": true, "errors.As": true, "errors.AsType": true}
 	for _, g := range s.Guards {
 		guards[g] = true
 	}
@@ -75,7 +76,7 @@ func run(pass *analysis.Pass, guards map[string]bool) {
 			pass.Report(analysis.Diagnostic{
 				Pos:     call.Pos(),
 				End:     call.End(),
-				Message: "a 404 answer must follow a check of the error kind: guard it with errors.Is or errors.As on the error, so that an outage does not look like a missing resource",
+				Message: "a 404 answer must follow a check of the error kind: guard it with errors.Is, errors.As or errors.AsType on the error, so that an outage does not look like a missing resource",
 				URL:     url,
 			})
 		case c.hasGuardBranch(test.branch) && carriesError(pass.TypesInfo, call.Args):
@@ -126,10 +127,12 @@ type errorTest struct {
 }
 
 // cond is a condition that holds at the call: the disjunction of exprs, or its
-// negation for the else branch of an if statement.
+// negation for the else branch of an if statement. init is the init statement
+// of that if statement or tagless switch statement.
 type cond struct {
 	exprs   []ast.Expr
 	negated bool
+	init    ast.Stmt
 }
 
 // findErrorTest walks from the call to the innermost enclosing if statement or
@@ -146,7 +149,7 @@ func findErrorTest(info *types.Info, cur inspector.Cursor) (errorTest, bool) {
 		case edge.IfStmt_Body, edge.IfStmt_Else:
 			stmt := cur.Parent().Node().(*ast.IfStmt)
 			negated := cur.ParentEdgeKind() == edge.IfStmt_Else
-			conds = append(conds, cond{exprs: []ast.Expr{stmt.Cond}, negated: negated})
+			conds = append(conds, cond{exprs: []ast.Expr{stmt.Cond}, negated: negated, init: stmt.Init})
 			if e := nonNilError(info, []ast.Expr{stmt.Cond}, negated); e != nil {
 				return errorTest{err: e, conds: conds, branch: cur.Node()}, true
 			}
@@ -155,13 +158,22 @@ func findErrorTest(info *types.Info, cur inspector.Cursor) (errorTest, bool) {
 			if len(clause.List) == 0 {
 				continue
 			}
-			conds = append(conds, cond{exprs: clause.List})
+			conds = append(conds, cond{exprs: clause.List, init: taglessInit(cur.Parent().Parent().Parent().Node())})
 			if e := nonNilError(info, clause.List, false); e != nil {
 				return errorTest{err: e, conds: conds, branch: clause}, true
 			}
 		}
 	}
 	return errorTest{}, false
+}
+
+// taglessInit returns the init statement of a switch statement with no tag,
+// whose case expressions are conditions, or nil.
+func taglessInit(n ast.Node) ast.Stmt {
+	if sw, ok := n.(*ast.SwitchStmt); ok && sw.Tag == nil {
+		return sw.Init
+	}
+	return nil
 }
 
 // nonNilError returns an error value that each expression implies to be
@@ -229,8 +241,9 @@ type checker struct {
 func (c checker) guarded(conds []cond) bool {
 	for _, cd := range conds {
 		all := len(cd.exprs) > 0
+		leaf := c.guardLeaf(c.initGuards(cd.init))
 		for _, x := range cd.exprs {
-			all = all && c.implies(x, cd.negated)
+			all = all && c.impliesLeaf(x, cd.negated, leaf)
 		}
 		if all {
 			return true
@@ -251,7 +264,17 @@ func (c checker) hasGuardBranch(branch ast.Node) bool {
 		case *ast.FuncLit:
 			return false
 		case *ast.IfStmt:
-			found = c.callsGuard(n.Cond)
+			found = c.callsGuard(n.Cond) || c.readsAny(n.Cond, c.initGuards(n.Init))
+		case *ast.SwitchStmt:
+			vars := c.initGuards(taglessInit(n))
+			for _, clause := range n.Body.List {
+				// The body of a switch statement holds only case clauses.
+				if clause != branch {
+					for _, x := range clause.(*ast.CaseClause).List {
+						found = found || c.readsAny(x, vars)
+					}
+				}
+			}
 		case *ast.CaseClause:
 			if n != branch {
 				for _, x := range n.List {
@@ -275,10 +298,44 @@ func (c checker) callsGuard(x ast.Expr) bool {
 	return found
 }
 
-// implies reports whether the expression, where it holds (or where it does
-// not hold, when negated), makes a guard call on the tested error true.
-func (c checker) implies(x ast.Expr, negated bool) bool {
-	return c.impliesLeaf(x, negated, c.guardLeaf)
+// initGuards returns the boolean variables that an if init statement assigns
+// from a guard call on the tested error, as ok in
+// `if _, ok := errors.AsType[*E](err); ok`.
+func (c checker) initGuards(init ast.Stmt) map[types.Object]bool {
+	assign, ok := init.(*ast.AssignStmt)
+	if !ok || len(assign.Rhs) != 1 {
+		return nil
+	}
+	call, ok := ast.Unparen(assign.Rhs[0]).(*ast.CallExpr)
+	if !ok || !c.isGuard(call) {
+		return nil
+	}
+	vars := map[types.Object]bool{}
+	for _, lhs := range assign.Lhs {
+		id, ok := lhs.(*ast.Ident)
+		if !ok {
+			continue
+		}
+		if obj := c.info.ObjectOf(id); obj != nil && isBool(obj.Type()) {
+			vars[obj] = true
+		}
+	}
+	return vars
+}
+
+// readsAny reports whether the expression reads one of the variables.
+func (c checker) readsAny(x ast.Expr, vars map[types.Object]bool) bool {
+	if len(vars) == 0 {
+		return false
+	}
+	found := false
+	ast.Inspect(x, func(n ast.Node) bool {
+		if id, ok := n.(*ast.Ident); ok && vars[c.info.ObjectOf(id)] {
+			found = true
+		}
+		return !found
+	})
+	return found
 }
 
 // impliesLeaf reports whether the expression, where it holds (or where it does
@@ -310,9 +367,21 @@ func (c checker) impliesLeaf(x ast.Expr, negated bool, leaf func(ast.Expr, bool)
 	return leaf(x, negated)
 }
 
-func (c checker) guardLeaf(x ast.Expr, negated bool) bool {
-	call, ok := x.(*ast.CallExpr)
-	return ok && c.isGuard(call) && !negated
+// guardLeaf returns the leaf test for a guard: a guard call on the tested
+// error, or a variable of vars.
+func (c checker) guardLeaf(vars map[types.Object]bool) func(ast.Expr, bool) bool {
+	return func(x ast.Expr, negated bool) bool {
+		if negated {
+			return false
+		}
+		switch x := x.(type) {
+		case *ast.CallExpr:
+			return c.isGuard(x)
+		case *ast.Ident:
+			return vars[c.info.ObjectOf(x)]
+		}
+		return false
+	}
 }
 
 func (c checker) nonNilLeaf(x ast.Expr, negated bool) bool {
@@ -376,6 +445,11 @@ func carriesError(info *types.Info, args []ast.Expr) bool {
 		})
 	}
 	return found
+}
+
+func isBool(t types.Type) bool {
+	b, ok := t.Underlying().(*types.Basic)
+	return ok && b.Info()&types.IsBoolean != 0
 }
 
 func isErrorInterface(t types.Type) bool {
