@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url'
 import { expect, test } from 'vitest'
-import { DEFAULT_TAILWIND_RESTRICT, playwright, react, testingLibrary } from '../index.ts'
+import { playwright, react, testingLibrary } from '../index.ts'
 
 test('the testing library preset carries the rules of the flat react config', () => {
   expect(testingLibrary.jsPlugins).toEqual([fileURLToPath(import.meta.resolve('eslint-plugin-testing-library'))])
@@ -46,7 +46,7 @@ test('without the react doctor option the configuration names nothing of it', ()
   expect(JSON.stringify(react())).not.toContain('react-doctor')
 })
 
-test('the tailwind restrict option replaces the default restricted classes', () => {
+test('the tailwind restrict option turns on the rule with the restricted classes of the repository', () => {
   const restrict = [{ pattern: '^(.*:)?fixed$', message: 'Keep it in the flow.' }]
   const config = react({ tailwind: { entryPoint: './src/app.css', restrict } })
 
@@ -59,9 +59,9 @@ test('the tailwind restrict option replaces the default restricted classes', () 
   })
 })
 
-test('the tailwind restrict false switches the rule off and the default names the restricted classes', () => {
-  const config = react({ tailwind: { entryPoint: './src/app.css', restrict: false } })
+test('without the tailwind restrict option no class is restricted', () => {
+  const config = react({ tailwind: { entryPoint: './src/app.css' } })
 
   expect(config.overrides).toContainEqual({ files: ['**/*.{ts,tsx}'], rules: { 'better-tailwindcss/enforce-canonical-classes': 'error' } })
-  expect(DEFAULT_TAILWIND_RESTRICT.map(({ pattern }) => pattern)).toEqual(['color-mix', '^(.*:)?absolute$', '^(.*:)?-?z-(\\d+|auto|\\[.*\\]|\\(.*\\))$'])
+  expect(JSON.stringify(config)).not.toContain('no-restricted-classes')
 })

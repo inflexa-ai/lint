@@ -1,17 +1,17 @@
 # no-raw-effect
 
-Write an effect as a named hook in the hooks package. Do not import the effect primitives of react.
+Write an effect as a named hook. Do not import the effect primitives of react in app code.
 
 ## Why
 
-The effect primitives stay inside the hooks package. In app code:
+The effect primitives stay out of app code. In app code:
 
 - Compute a derived value during render.
 - React to a user action in its event handler.
 - Load data with TanStack Query.
 - Reset state by a change of a `key`.
 
-A reusable effect belongs in the hooks package, as a named hook.
+A reusable effect belongs in a named hook, in a file that the configuration of the repository exempts from this rule.
 
 All three effect primitives are banned together. A ban of `useEffect` alone would make `useLayoutEffect` the obvious way around the rule.
 

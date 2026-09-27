@@ -17,33 +17,6 @@ function pluginPath(specifier: string): string {
 /** One entry of `better-tailwindcss/no-restricted-classes`. */
 export type RestrictedClass = { pattern: string; message: string }
 
-/**
- * The classes that no component of Inflexa writes. A computed color is one
- * that the palette test never measures, and one that each component computes
- * again. A component lays out with flex and grid, and stacks through a named
- * layer, so no component guesses the number that sits above or below another
- * one.
- *
- * A repository replaces the list with `restrict`, and switches it off with
- * `restrict: false`.
- */
-export const DEFAULT_TAILWIND_RESTRICT: RestrictedClass[] = [
-  {
-    pattern: 'color-mix',
-    message: 'Do not compute a color in a class. Declare the color as a token in the theme of the design system, map it under `@theme inline`, and use its class.',
-  },
-  {
-    pattern: '^(.*:)?absolute$',
-    message:
-      'Lay this out with flex or grid: a row with `justify-between`, an item with `ml-auto` or `flex-1`. Absolute positioning is a last resort. When no layout serves, keep it with `// oxlint-disable-next-line better-tailwindcss/no-restricted-classes -- <reason>`.',
-  },
-  {
-    pattern: '^(.*:)?-?z-(\\d+|auto|\\[.*\\]|\\(.*\\))$',
-    message:
-      'Do not pick a z-index number. Use a named layer of the theme of the design system, and add a layer there when none fits. Order content with flex or grid before you stack it.',
-  },
-]
-
 // SAFETY: `require` of an ES module returns its namespace, and the type names
 // the namespace of the same package. The specifier type admits no other one.
 const loadReactDoctor = createRequire(import.meta.url) as (specifier: 'eslint-plugin-react-doctor') => typeof import('eslint-plugin-react-doctor')
@@ -101,11 +74,11 @@ export type ReactOptions = TypescriptOptions & {
    * the second says which step of the scale it is. The rule fires only where a
    * canonical class exists, thus a real one-off stays writable.
    *
-   * `restrict` holds the classes that no component writes. Absent, the
-   * repository gets `DEFAULT_TAILWIND_RESTRICT`. `false` switches the rule off,
-   * and a list replaces the default one.
+   * `restrict` holds the classes that no component of the repository writes,
+   * each with the message that names what to write instead. Absent, the rule
+   * that restricts classes stays off.
    */
-  tailwind?: { entryPoint: string; restrict?: false | RestrictedClass[] }
+  tailwind?: { entryPoint: string; restrict?: RestrictedClass[] }
   /**
    * React Doctor, for the React code of the repository: the recommended rules,
    * with the TanStack Query rules on top. The mistakes that the rules of hooks
@@ -180,8 +153,8 @@ export function react({ tailwind, reactDoctor, overrides = [], env, ...options }
   if (tailwind) settings['better-tailwindcss'] = { entryPoint: tailwind.entryPoint }
 
   const tailwindRules: NonNullable<OxlintOverride['rules']> = { 'better-tailwindcss/enforce-canonical-classes': 'error' }
-  if (tailwind && tailwind.restrict !== false) {
-    tailwindRules['better-tailwindcss/no-restricted-classes'] = ['error', { restrict: tailwind.restrict ?? DEFAULT_TAILWIND_RESTRICT }]
+  if (tailwind?.restrict) {
+    tailwindRules['better-tailwindcss/no-restricted-classes'] = ['error', { restrict: tailwind.restrict }]
   }
 
   return {

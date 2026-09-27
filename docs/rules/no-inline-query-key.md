@@ -1,18 +1,18 @@
 # no-inline-query-key
 
-Take a query key from the data module that owns the resource. Do not write the key out at the call.
+Take a query key from the factory that owns the resource. Do not write the key out at the call.
 
 ## Why
 
-A key belongs to the module that owns the resource. `billingQueries.all(orgId)` is that key. A caller that writes `['billing', orgId]` out again holds a second copy of it. The day that the data module changes its key, the copy goes on matching nothing. The cache is never dropped, the screen keeps stale data, and every test stays green. A filter that matches no entry is not a failure.
+A key belongs to the factory that owns the resource. `todoQueries.all()` is that key. A caller that writes `['todos']` out again holds a second copy of it. The day that the factory changes its key, the copy goes on matching nothing. The cache is never dropped, the screen keeps stale data, and every test stays green. A filter that matches no entry is not a failure.
 
 A typo in a namespace is already a compile error: the `Register` union refuses a namespace that the app never declared. A key that is spelled right and duplicated is what nothing else sees.
 
 ## What the rule reports
 
 - An array literal as the key of a call on the query client or on the query cache. The array inside the filters or the options object of such a call counts too.
-- A literal that spreads a factory call and adds elements after it, as in `[...billingQueries.all(orgId), "usage"]`. The elements after the spread are the half that drifts. A prefix that no entry yields yet is an entry that the data module gains.
-- A call that goes through an indirection, where the arguments cannot be read. Call the method directly, as in `queryClient.invalidateQueries({ queryKey: billingQueries.all(orgId) })`.
+- A literal that spreads a factory call and adds elements after it, as in `[...todoQueries.all(), "done"]`. The elements after the spread are the half that drifts. A prefix that no entry yields yet is an entry that the factory gains.
+- A call that goes through an indirection, where the arguments cannot be read. Call the method directly, as in `queryClient.invalidateQueries({ queryKey: todoQueries.all() })`.
 
 ## What the rule leaves alone
 

@@ -22,7 +22,7 @@ const CACHE_OWNERS = new Set(['QueryClient', 'QueryCache'])
 
 /**
  * The value under the assertions written around it. A key is a tuple, so it is
- * written `['billing', orgId] as const`, and that is the same array literal as
+ * written `['todos', id] as const`, and that is the same array literal as
  * the one without the assertion.
  */
 function withoutAssertions(node: ts.Expression): ts.Expression {
@@ -40,9 +40,9 @@ function withoutAssertions(node: ts.Expression): ts.Expression {
 }
 
 /**
- * A key belongs to the module that owns the resource. `billingQueries.all(orgId)`
- * is that key, and a caller that writes `['billing', orgId]` out again holds a
- * second copy of it. The day the data module changes its key, the copy goes on
+ * A key belongs to the factory that owns the resource. `todoQueries.all()` is
+ * that key, and a caller that writes `['todos']` out again holds a second copy
+ * of it. The day the factory changes its key, the copy goes on
  * matching nothing: the cache is never dropped, the screen keeps stale data, and
  * every test stays green, because a filter that matches no entry is not a
  * failure. The `Register` union already refuses a namespace the app never
@@ -73,15 +73,15 @@ export const noInlineQueryKey: TSESLint.RuleModule<'indirectCall' | 'inlineQuery
   meta: {
     type: 'problem',
     docs: {
-      description: 'Take a query key from the data module that owns the resource',
+      description: 'Take a query key from the factory that owns the resource',
       url: 'https://github.com/inflexa-ai/lint/blob/main/docs/rules/no-inline-query-key.md',
     },
     schema: [],
     messages: {
       indirectCall:
-        'This call goes through `{{through}}`, where the arguments cannot be read, so nothing here can tell whether the key came from a factory or was written out at the call. Call the method directly, `queryClient.invalidateQueries({ queryKey: billingQueries.all(orgId) })`: app code has no need for the indirection, and reaching for it is how a second copy of a key gets past this rule.',
+        'This call goes through `{{through}}`, where the arguments cannot be read, so nothing here can tell whether the key came from a factory or was written out at the call. Call the method directly, `queryClient.invalidateQueries({ queryKey: todoQueries.all() })`: app code has no need for the indirection, and reaching for it is how a second copy of a key gets past this rule.',
       inlineQueryKey:
-        'This key is written out at the call, which makes a second copy of a key the resource\'s data module already owns. The day that module changes its key, this call matches nothing and no test fails, because a filter that matches no entry is not a failure. Take the key from the factory in `apps/<app>/src/data/<resource>.ts`: an entry\'s own `.queryKey` for one query, `billingQueries.usage(orgId, bcId).queryKey`, and the key-only `all` entry for the prefix that covers the resource, `billingQueries.all(orgId)`. A literal that spreads a factory call and adds elements after it, `[...billingQueries.all(orgId), "usage"]`, is the same copy: the elements after the spread are the half that drifts. A prefix no entry yields yet is an entry that data module gains.',
+        'This key is written out at the call, which makes a second copy of a key that the query key factory of the resource already owns. The day that factory changes its key, this call matches nothing and no test fails, because a filter that matches no entry is not a failure. Take the key from the factory: an entry\'s own `.queryKey` for one query, `todoQueries.detail(id).queryKey`, and the key-only `all` entry for the prefix that covers the resource, `todoQueries.all()`. A literal that spreads a factory call and adds elements after it, `[...todoQueries.all(), "done"]`, is the same copy: the elements after the spread are the half that drifts. A prefix no entry yields yet is an entry that the factory gains.',
     },
   },
   create(context) {

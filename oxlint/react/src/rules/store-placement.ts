@@ -20,7 +20,7 @@ export const storePlacement: TSESLint.RuleModule<'factoryOutsideStore' | 'server
   meta: {
     type: 'problem',
     docs: {
-      description: 'Keep feature stores in *.store.ts files and keep server data out of them',
+      description: 'Keep stores in store files and keep server data out of them',
       url: 'https://github.com/inflexa-ai/lint/blob/main/docs/rules/store-placement.md',
     },
     schema: [
@@ -37,7 +37,7 @@ export const storePlacement: TSESLint.RuleModule<'factoryOutsideStore' | 'server
     defaultOptions: [DEFAULTS],
     messages: {
       factoryOutsideStore:
-        "The factory from `{{factory}}` may only be used in a file named *.store.ts, so every piece of client state has a home that can be found by name. Move this store into <feature>.store.ts beside the feature's main component.",
+        "The factory from `{{factory}}` may only be used in a store file, a file whose name matches `{{pattern}}`, so every piece of client state has a home that can be found by name. Move this store into a store file beside the feature's main component.",
       serverDataInStore:
         '`{{source}}` cannot be imported into a store file. A store holds client state only: a copy of server data is stale as soon as the query refetches. Read server data from the query in the component that renders it.',
     },
@@ -49,7 +49,7 @@ export const storePlacement: TSESLint.RuleModule<'factoryOutsideStore' | 'server
 
     return moduleSourceVisitors((source, specifier) => {
       if (!isStoreFile && factorySource !== undefined && specifier === factorySource) {
-        context.report({ node: source, messageId: 'factoryOutsideStore', data: { factory: factorySource } })
+        context.report({ node: source, messageId: 'factoryOutsideStore', data: { factory: factorySource, pattern: storeFilePattern } })
       }
       if (isStoreFile && banned.some((pattern) => pattern.test(specifier))) {
         context.report({ node: source, messageId: 'serverDataInStore', data: { source: specifier } })

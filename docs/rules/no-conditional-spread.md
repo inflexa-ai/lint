@@ -8,7 +8,7 @@ Write a property directly. Do not spread a conditional object into an object lit
 
 The shape spreads through a codebase because it always type-checks and never looks wrong in isolation.
 
-Here, a missing key and a key with the value `undefined` mean the same, because `exactOptionalPropertyTypes` is off. Thus the direct form `{ key: value }` is correct when its value can be `undefined`.
+When `exactOptionalPropertyTypes` is off, a missing key and a key with the value `undefined` mean the same. Thus the direct form `{ key: value }` is correct when its value can be `undefined`.
 
 A rare object truly must miss the key, for example a `Headers` init or a strict JSON body. Then build the object in a named variable and add the key inside an `if`.
 

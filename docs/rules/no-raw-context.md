@@ -1,10 +1,10 @@
 # no-raw-context
 
-Make app contexts with the settled-context factory. Do not import the context primitives of react.
+Make app contexts with a context factory. Do not import the context primitives of react.
 
 ## Why
 
-A context re-renders every consumer when its value changes. App code can use a context only for a value that is settled before its subtree renders and keeps one identity while it is mounted. The settled-context factory makes that context. State that changes belongs in a feature store.
+A context re-renders every consumer when its value changes. App code can use a context only for a value that is settled before its subtree renders and keeps one identity while it is mounted. A context factory of the repository makes that context. State that changes belongs in a store.
 
 The factory hands back its own consumer hook. So `useContext` is banned together with `createContext`: app code that reaches for `useContext` holds a raw context object from a place outside the factories.
 

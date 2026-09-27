@@ -28,9 +28,9 @@ function isNothing(node: TSESTree.Node): boolean {
  * a codebase because it always type-checks and never looks wrong in isolation.
  *
  * Almost every instance exists only to keep an `undefined` out of an object,
- * which matters only under `exactOptionalPropertyTypes`. That flag stays off
- * here so that a missing key and an `undefined` one mean the same, which makes
- * the direct form `{ key: value }` correct. The rare object whose key really
+ * which matters only under `exactOptionalPropertyTypes`. Without that flag a
+ * missing key and an `undefined` one mean the same, which makes the direct form
+ * `{ key: value }` correct. The rare object whose key really
  * must be absent (a `Headers` init, a JSON body a server validates strictly) is
  * clearer as a named variable with the key added in an `if`.
  *
@@ -47,7 +47,7 @@ export const noConditionalSpread: TSESLint.RuleModule<'conditional' | 'emptyFall
     schema: [],
     messages: {
       conditional:
-        'A conditional spread hides a plain property assignment.{{direct}} Writing the property directly is correct when its value may be `undefined`: `exactOptionalPropertyTypes` is off here, so a missing key and an `undefined` one mean the same. When the key truly must be absent, build the object in a named variable and add the key inside an `if`.',
+        'A conditional spread hides a plain property assignment.{{direct}} Writing the property directly is correct when its value may be `undefined` and `exactOptionalPropertyTypes` is off, because then a missing key and an `undefined` one mean the same. When the key truly must be absent, build the object in a named variable and add the key inside an `if`.',
       emptyFallback: 'Spreading `undefined` or `null` into an object is already a no-op, so the `{{operator}} {}` fallback does nothing. Spread the value itself.',
     },
   },

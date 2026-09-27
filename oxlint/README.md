@@ -32,13 +32,17 @@ Three parts of the lint cannot run in oxlint yet:
   cannot guard the directive that switches it off.
 
 ESLint runs the first two parts, through the `./eslint` export of each package.
-The command `inflexa-architecture-directives` runs the guard.
+The command `directive-guard` runs the guard. By default it guards the rules
+whose names start with `@inflexa-ai/`. `--prefix` replaces that list, and
+`--allow-inline` names a rule that a directive can switch off with a reason.
 
 A repository installs `oxlint`, `oxlint-tsgolint`, `eslint`, and `typescript`
 beside the package. Pin `oxlint` and `oxlint-tsgolint` to exact versions,
 because JS plugins and type-aware rules are not under semver. The Tailwind and
 React Doctor plugins are optional peers. A repository that sets the `tailwind`
-option installs `eslint-plugin-better-tailwindcss`, and a repository that sets
+option installs `eslint-plugin-better-tailwindcss`. Its `restrict` list names
+the classes that no component writes, and without the list no class is
+restricted. A repository that sets
 the `reactDoctor` option installs `eslint-plugin-react-doctor`. The repository
 then calls a factory in its own `oxlint.config.ts`:
 
@@ -76,7 +80,7 @@ export default [
 The lint of a repository runs the three tools in this sequence:
 
 ```sh
-oxlint && eslint . && inflexa-architecture-directives
+oxlint && eslint . && directive-guard
 ```
 
 The factory gives the rules that apply to each file. The rules that depend on

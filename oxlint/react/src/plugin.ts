@@ -14,7 +14,7 @@ export const NAMESPACE = '@inflexa-ai/react'
 /**
  * The rules of Inflexa for React applications: where state, effects, context,
  * network access and text live. The stack is part of the rules: TanStack Query
- * and Router, zustand through a feature-store factory, and a text catalog.
+ * and Router, zustand through a store factory, and a text catalog.
  *
  * Each rule is checked against `TSESLint.RuleModule` where it is declared.
  */

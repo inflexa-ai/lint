@@ -1,6 +1,6 @@
 # store-placement
 
-Keep feature stores in `*.store.ts` files, and keep server data out of them.
+Keep stores in store files, and keep server data out of them. A store file is a file whose name matches `storeFilePattern`, by default `*.store.ts`.
 
 ## Why
 
@@ -8,12 +8,12 @@ The rule is two halves of one guarantee: client state is findable, and it is onl
 
 ## What the rule reports
 
-- The factory of the feature-store package, used outside a `*.store.ts` file. Move the store into `<feature>.store.ts` beside the primary component of the feature. Then every piece of client state has a home that can be found by name.
-- An import of server data inside a `*.store.ts` file. A store holds client state only. A copy of server data is stale as soon as the query refetches. Read server data from the query in the component that renders it.
+- The store factory, used outside a store file. Move the store into a store file beside the primary component of the feature. Then every piece of client state has a home that can be found by name.
+- An import of server data inside a store file. A store holds client state only. A copy of server data is stale as soon as the query refetches. Read server data from the query in the component that renders it.
 
 ## What the rule leaves alone
 
-- An import of server data outside a `*.store.ts` file. The rule reports server data only in a store file.
+- An import of server data outside a store file. The rule reports server data only in a store file.
 - The factory half until `factorySource` is set. With no module named, the rule reports no import.
 
 ## Options

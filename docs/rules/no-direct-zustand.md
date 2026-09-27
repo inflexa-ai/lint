@@ -1,10 +1,10 @@
 # no-direct-zustand
 
-Build a store with the feature-store factory. Do not import zustand directly.
+Build a store with a store factory. Do not import zustand directly.
 
 ## Why
 
-A store that zustand makes with its module-level `create()` is a singleton. Its state outlives navigation, and every instance of the feature shares it. The feature-store factory of the hooks package scopes a store to its mounted `Provider` instead. So zustand itself is imported only in the hooks package.
+A store that zustand makes with its module-level `create()` is a singleton. Its state outlives navigation, and every instance of the feature shares it. A store factory of the repository scopes a store to its mounted `Provider` instead. So zustand itself is imported only where that factory lives.
 
 ## What the rule reports
 
@@ -12,7 +12,7 @@ A store that zustand makes with its module-level `create()` is a singleton. Its 
 
 ## What the rule leaves alone
 
-- The hooks package, which imports zustand to build the factory.
+- The module of the factory, when the configuration of the repository leaves it out. The rule has no exception of its own, and the factory imports zustand to build a store.
 
 ## Options
 

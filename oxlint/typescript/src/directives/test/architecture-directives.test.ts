@@ -159,4 +159,14 @@ describe('checkArchitectureDirectives', () => {
     expect(failed.stderr).toContain('src/page.tsx:2:1: `@inflexa-ai/react/no-raw-state` is an architecture rule')
     expect(run('src/clean.ts')).toMatchObject({ status: 0, stderr: '' })
   })
+
+  it('takes the prefixes and the rules that can be disabled inline from the command line', () => {
+    const cli = fileURLToPath(new URL('../cli.ts', import.meta.url))
+    const run = (...args: string[]) => spawnSync(process.execPath, [cli, ...args], { cwd: root, encoding: 'utf8' })
+
+    expect(run('--prefix', 'acme/', 'src/page.tsx')).toMatchObject({ status: 0, stderr: '' })
+    const inline = run('--allow-inline', '@inflexa-ai/react/no-raw-state', 'src/page.tsx')
+    expect(inline.status).toBe(1)
+    expect(inline.stderr).toContain('`@inflexa-ai/react/no-raw-state` may be disabled here, but not silently')
+  })
 })

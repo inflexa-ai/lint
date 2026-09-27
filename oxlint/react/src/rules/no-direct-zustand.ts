@@ -8,16 +8,16 @@ const DEFAULTS: Options = { hint: '' }
 
 /**
  * A store made with zustand's module-level `create()` is a singleton: its state
- * outlives navigation and is shared by every instance of the feature. The
- * feature-store factory of the hooks package scopes a store to its mounted
- * Provider instead, so zustand itself is only imported there. Type-only imports are reported too;
- * the factory re-exports the one type a store file needs.
+ * outlives navigation and is shared by every instance of the feature. A store
+ * factory of the repository scopes a store to its mounted Provider instead, so
+ * zustand itself is only imported where that factory lives. Type-only imports
+ * are reported too; the factory re-exports the one type a store file needs.
  */
 export const noDirectZustand: TSESLint.RuleModule<'direct', [Partial<Options>]> = {
   meta: {
     type: 'problem',
     docs: {
-      description: 'Reach zustand only through the feature-store factory',
+      description: 'Reach zustand only through a store factory',
       url: 'https://github.com/inflexa-ai/lint/blob/main/docs/rules/no-direct-zustand.md',
     },
     schema: [
@@ -31,7 +31,7 @@ export const noDirectZustand: TSESLint.RuleModule<'direct', [Partial<Options>]> 
     defaultOptions: [DEFAULTS],
     messages: {
       direct:
-        '`{{source}}` cannot be imported here. Build the store with the feature-store factory, so each mounted feature gets its own store instead of a module-level singleton.{{hint}}',
+        '`{{source}}` cannot be imported here. Build the store with the store factory of this repository, so each mounted feature gets its own store instead of a module-level singleton.{{hint}}',
     },
   },
   create(context) {

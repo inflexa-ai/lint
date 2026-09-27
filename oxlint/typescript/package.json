@@ -1,6 +1,6 @@
 {
   "name": "@inflexa-ai/oxlint-plugin",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "The oxlint rules and configuration of Inflexa for TypeScript, and the ESLint configuration of its typed rules.",
   "keywords": [
     "oxlint",
@@ -41,7 +41,7 @@
     "./package.json": "./package.json"
   },
   "bin": {
-    "inflexa-architecture-directives": "dist/directives/cli.js"
+    "directive-guard": "dist/directives/cli.js"
   },
   "files": [
     "dist"

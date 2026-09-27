@@ -8,11 +8,11 @@ In app code, each kind of state has one home:
 
 - Server data: TanStack Query.
 - Shareable view state, as filters, tabs, selection and pagination: the route search params.
-- Form fields: TanStack Form.
-- State that the components of one feature share: a `*.store.ts` file built with the feature-store factory.
+- Form fields: a form library.
+- State that the components of one feature share: a store that is scoped to that feature.
 - An open/close flag: an uncontrolled primitive or a disclosure hook.
 
-State that a reusable component owns belongs with that component in the UI package. The primitives of react give none of these homes, so `useState` and `useReducer` are banned in app code.
+State that a reusable component owns belongs with that component in its shared package. The primitives of react give none of these homes, so `useState` and `useReducer` are banned in app code.
 
 ## What the rule reports
 

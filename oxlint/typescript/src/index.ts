@@ -174,7 +174,7 @@ export type TypescriptOptions = {
 }
 
 /**
- * The oxlint configuration that each TypeScript repository of Inflexa shares:
+ * The shared oxlint configuration of a TypeScript repository:
  * the recommended rules of ESLint, the strict type-checked preset of
  * typescript-eslint through tsgolint, and the rules for the shape of code and
  * for tests.
@@ -184,10 +184,9 @@ export type TypescriptOptions = {
  * zone globs belong to the repository, because a glob in this package would
  * match nothing in a repository with a different layout.
  *
- * Two parts of the lint of Inflexa run outside of it: the rules that read the
- * types of typescript-eslint, through the ESLint configuration of `./eslint`,
- * and the guard of the disable directives, through the command
- * `inflexa-architecture-directives`.
+ * Two parts of the lint run outside of it: the rules that read the types of
+ * typescript-eslint, through the ESLint configuration of `./eslint`, and the
+ * guard of the disable directives, through the command `directive-guard`.
  */
 export function typescript({
   ignores = [],

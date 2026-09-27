@@ -8,8 +8,10 @@ export type Violation = { line: number; column: number; message: string }
 export type FileViolation = Violation & { file: string }
 
 /**
- * The rules that no file can switch off in silence. The prefix also matches
- * `@inflexa-ai/react/`, thus one guard covers the rules of both plugins.
+ * The rules that no file can switch off in silence: by default, the rules of
+ * the two plugins of this workspace, whose names start with `@inflexa-ai/`. The
+ * command takes other prefixes through `--prefix`, and other rules that can be
+ * disabled inline through `--allow-inline`.
  */
 export const ARCHITECTURE_RULES = {
   prefixes: ['@inflexa-ai/'],

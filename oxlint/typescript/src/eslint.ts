@@ -16,7 +16,7 @@ export type TypedRulesOptions = {
 }
 
 /**
- * The part of the lint of Inflexa that oxlint cannot run yet, as an ESLint
+ * The part of the lint that oxlint cannot run yet, as an ESLint
  * configuration. oxlint gives a JS plugin no type information, thus the rules
  * of this plugin that read types run here: `require-abort-signal`, and
  * `no-inline-query-key` of the React plugin. tsgolint does not have

@@ -8,7 +8,7 @@ An inline disable directive cannot switch off an architecture rule in silence, i
 
 ### Requirement: The command reports each inline disable of an architecture rule
 
-The command `inflexa-architecture-directives` of `@inflexa-ai/oxlint-plugin` SHALL report each `eslint-disable` and each `oxlint-disable` directive, in its line, next-line and block forms, that names a rule whose id starts with `@inflexa-ai/` or that names no rule. It SHALL print each report as `file:line:column: message` and SHALL exit with status 1 when it reports anything.
+The command `directive-guard` of `@inflexa-ai/oxlint-plugin` SHALL report each `eslint-disable` and each `oxlint-disable` directive, in its line, next-line and block forms, that names a rule whose id starts with a guarded prefix or that names no rule. The guarded prefix SHALL be `@inflexa-ai/` unless the command gets `--prefix`, which replaces the list. It SHALL print each report as `file:line:column: message` and SHALL exit with status 1 when it reports anything.
 
 #### Scenario: A directive switches off an architecture rule
 
@@ -17,7 +17,7 @@ The command `inflexa-architecture-directives` of `@inflexa-ai/oxlint-plugin` SHA
 
 ### Requirement: A test file can argue its own placement
 
-The command SHALL accept a directive for `@inflexa-ai/test-placement` that gives a reason after ` -- `, and SHALL report the same directive without a reason. A blanket directive SHALL stay a report.
+The command SHALL accept a directive for `@inflexa-ai/test-placement`, or for each rule that `--allow-inline` names instead, that gives a reason after ` -- `, and SHALL report the same directive without a reason. A blanket directive SHALL stay a report.
 
 #### Scenario: A directive with a reason
 

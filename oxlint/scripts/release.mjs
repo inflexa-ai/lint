@@ -100,6 +100,7 @@ for (const { dir, manifest } of packages) {
   const target = path.join(releaseDir, manifest.name.replace('@inflexa-ai/', ''))
   cpSync(path.join(workspace, dir, 'dist'), path.join(target, 'dist'), { recursive: true })
   cpSync(path.join(workspace, dir, 'LICENSE'), path.join(target, 'LICENSE'))
+  cpSync(path.join(workspace, dir, 'README.md'), path.join(target, 'README.md'))
 
   const dependencies = Object.fromEntries(Object.entries(manifest.dependencies ?? {}).map(([name, range]) => [name, scopeNames.has(name) ? version : range]))
   const stagedManifest = {
@@ -162,8 +163,8 @@ const eslintEntry = capture(
   smoke,
 )
 if (eslintEntry.status !== 0) fail(`the ESLint entry did not load:\n${eslintEntry.stderr}`)
-const guard = capture('npx', ['--no-install', 'inflexa-architecture-directives', 'src'], smoke)
-if (guard.status !== 0) fail(`inflexa-architecture-directives failed:\n${guard.stderr}`)
+const guard = capture('npx', ['--no-install', 'directive-guard', 'src'], smoke)
+if (guard.status !== 0) fail(`directive-guard failed:\n${guard.stderr}`)
 rmSync(smoke, { recursive: true, force: true })
 console.log('\nrelease: the tarballs install and load')
 
