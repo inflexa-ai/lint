@@ -114,6 +114,10 @@ func lowerFirst(s string) string {
 	return string(unicode.ToLower(r)) + s[size:]
 }
 
+// uuidPackages holds `uuid`, the standard library package since Go 1.27, and
+// the third-party package that came before it.
+var uuidPackages = map[string]bool{"uuid": true, "github.com/google/uuid": true}
+
 func isUUID(t types.Type) bool {
 	if p, ok := types.Unalias(t).(*types.Pointer); ok {
 		t = p.Elem()
@@ -123,5 +127,5 @@ func isUUID(t types.Type) bool {
 		return false
 	}
 	obj := named.Obj()
-	return obj.Pkg() != nil && obj.Pkg().Path() == "github.com/google/uuid" && obj.Name() == "UUID"
+	return obj.Pkg() != nil && uuidPackages[obj.Pkg().Path()] && obj.Name() == "UUID"
 }

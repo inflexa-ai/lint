@@ -248,6 +248,10 @@ export function typescript({
           // guarantees the shape. Narrow it, give it a `satisfies`, or parse it
           // with a schema.
           'typescript/no-unsafe-type-assertion': 'error',
+          // An inferred return type changes with the body and reaches each caller
+          // with no error at the function. A callback and a function that a typed
+          // binding receives already have a type from their context.
+          'typescript/explicit-function-return-type': ['error', { allowExpressions: true, allowTypedFunctionExpressions: true }],
         },
       },
       {
@@ -275,12 +279,14 @@ export function typescript({
       },
       {
         // A test varies a dependency by passing it in, never by swapping the
-        // module under it: a mock that the runner hoists runs a graph that the
-        // program never assembles.
+        // module under it: a module mock runs a graph that the program never
+        // assembles.
         files: tests,
         rules: {
           [`${NAMESPACE}/no-module-mocking`]: 'error',
           [`${NAMESPACE}/test-placement`]: 'error',
+          // A test helper has its callers in the same file.
+          'typescript/explicit-function-return-type': 'off',
         },
       },
       ...overrides,

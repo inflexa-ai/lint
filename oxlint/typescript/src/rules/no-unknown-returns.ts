@@ -50,7 +50,8 @@ export const noUnknownReturns: TSESLint.RuleModule<'unknownReturn'> = {
 
     function check(node: FunctionLike): void {
       const annotation = node.returnType
-      if (annotation === undefined) return
+      // typescript-estree leaves an absent return type `undefined`, and oxlint gives `null`.
+      if (!annotation) return
       if (!resolvesToUnknown(annotation.typeAnnotation, enclosingTypeParameterNames(node))) return
       context.report({ node: annotation.typeAnnotation, messageId: 'unknownReturn' })
     }

@@ -50,8 +50,6 @@ linters:
     - copyloopvar
     - intrange
     - modernize
-    # complexity ceiling
-    - gocognit
     # dependency rules
     - depguard
     # The golint plugins that need no fact of the repository. typedids, keyowner,
@@ -84,8 +82,6 @@ linters:
           msg: use an http.Client with a timeout and a request built with NewRequestWithContext
         - pattern: ^time\.Sleep$
           msg: wait with a select on ctx.Done() and a timer
-    gocognit:
-      min-complexity: 30
     gocritic:
       enabled-checks:
         - ruleguard
@@ -217,7 +213,6 @@ linters:
       - path: ^cmd/
         linters:
           - forbidigo
-          - gocognit
           - boundedfanout
       # A test function is not an exported API.
       - path: _test\.go

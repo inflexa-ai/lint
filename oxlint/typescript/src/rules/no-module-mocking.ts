@@ -1,14 +1,16 @@
 import { TSESLint, type TSESTree } from '@typescript-eslint/utils'
 import { AST_NODE_TYPES } from '@typescript-eslint/utils'
-import { exportedName, isGlobalIdentifier, staticMemberName } from '../helpers/static-names.ts'
+import { exportedName, staticMemberName } from '../helpers/static-names.ts'
 
-// The calls that replace a whole module with a stand-in the test framework
-// builds, rather than a value the code was handed.
-const MOCK_METHODS = new Set(['mock', 'doMock', 'unstable_mockModule'])
-
-// Where each framework object comes from when a file imports it instead of
-// taking it from the test globals.
-const FRAMEWORKS: Record<string, string> = { vi: 'vitest', jest: '@jest/globals' }
+// Each framework object, the module a file imports it from instead of taking
+// it from the test globals, and its calls that replace a whole module with a
+// stand-in the framework builds, rather than a value the code was handed.
+const JEST_LIKE_METHODS = new Set(['mock', 'doMock', 'unstable_mockModule'])
+const FRAMEWORKS: Record<string, { source: string; methods: Set<string> }> = {
+  vi: { source: 'vitest', methods: JEST_LIKE_METHODS },
+  jest: { source: '@jest/globals', methods: JEST_LIKE_METHODS },
+  mock: { source: 'bun:test', methods: new Set(['module']) },
+}
 
 /** The variable an identifier resolves to, looking outward from its scope. */
 function variableFor(sourceCode: TSESLint.SourceCode, node: TSESTree.Identifier): TSESLint.Scope.Variable | undefined {
@@ -20,21 +22,23 @@ function variableFor(sourceCode: TSESLint.SourceCode, node: TSESTree.Identifier)
 }
 
 /**
- * `vi.mock('../db', …)` and `jest.mock` swap a module for a stand-in the
- * framework hoists above the imports, so the test runs a graph the program
- * never assembles: a mock drifts from the module it stands for, the hoisting
- * surprises the next reader, and the test passes while the real wiring is
- * broken.
+ * `vi.mock('../db', …)`, `jest.mock` and `mock.module` of `bun:test` swap a
+ * module for a stand-in the framework builds, so the test runs a graph the
+ * program never assembles: a mock drifts from the module it stands for, the
+ * hoisting of `vi.mock` and `jest.mock` surprises the next reader, and the test
+ * passes while the real wiring is broken.
  *
  * A dependency a test needs to vary is passed in. A hook takes it as an
  * argument, a client is built from an injected `fetch`, a store is created for
  * the test. The stand-in is then a plain value the test controls, and the code
  * under test runs exactly as it does in the app.
  *
- * The framework object is recognised by what it denotes: `vi` and `jest` from
- * the test globals, and the same names imported from `vitest` and
- * `@jest/globals`. A binding of one's own that happens to be called `vi` is
- * left alone, and `vi['mock']` is the same call as `vi.mock`.
+ * The framework object is recognised by what it denotes: `vi`, `jest` and
+ * `mock` from the test globals, and the same names imported from `vitest`,
+ * `@jest/globals` and `bun:test` under any local name or read off a namespace
+ * import of that module. A binding of one's own
+ * that happens to be called `vi` is left alone, and `vi['mock']` is the same
+ * call as `vi.mock`.
  */
 export const noModuleMocking: TSESLint.RuleModule<'moduleMock'> = {
   meta: {
@@ -46,34 +50,53 @@ export const noModuleMocking: TSESLint.RuleModule<'moduleMock'> = {
     schema: [],
     messages: {
       moduleMock:
-        '`{{call}}` replaces a whole module with a framework stand-in the runner hoists above the imports, so the test runs a graph the app never assembles. Pass the dependency in instead: take it as an argument, build the client from an injected `fetch`, or make the store the test needs. Then the stand-in is a value the test controls and the code runs as it does in the app.',
+        '`{{call}}` replaces a whole module with a framework stand-in, so the test runs a graph the app never assembles. Pass the dependency in instead: take it as an argument, build the client from an injected `fetch`, or make the store the test needs. Then the stand-in is a value the test controls and the code runs as it does in the app.',
     },
   },
   create(context) {
     const { sourceCode } = context
 
-    /** Whether an identifier denotes a framework object, as a global or as its import. */
-    function isFramework(node: TSESTree.Identifier): boolean {
-      if (!(node.name in FRAMEWORKS)) return false
-      const variable = variableFor(sourceCode, node)
-      if (variable === undefined || variable.defs.length === 0) return isGlobalIdentifier(sourceCode, node)
-      return variable.defs.some(
-        (def) =>
-          def.type === TSESLint.Scope.DefinitionType.ImportBinding &&
-          def.parent.type === AST_NODE_TYPES.ImportDeclaration &&
-          def.parent.source.value === FRAMEWORKS[node.name] &&
-          def.node.type === AST_NODE_TYPES.ImportSpecifier &&
-          exportedName(def.node.imported) === node.name,
+    /** The import specifiers that bind an identifier, beside the module that each one names. */
+    function importsOf(node: TSESTree.Identifier): { specifier: TSESTree.Node; source: string }[] {
+      return (variableFor(sourceCode, node)?.defs ?? []).flatMap((def) =>
+        def.type === TSESLint.Scope.DefinitionType.ImportBinding && def.parent.type === AST_NODE_TYPES.ImportDeclaration
+          ? [{ specifier: def.node, source: def.parent.source.value }]
+          : [],
       )
+    }
+
+    /**
+     * The framework object an expression denotes, and the spelling of it for a
+     * message: a global, a named import under any local name, or a member of a
+     * namespace import of the framework module.
+     */
+    function frameworkOf(node: TSESTree.Expression): { name: string; path: string } | undefined {
+      if (node.type === AST_NODE_TYPES.Identifier) {
+        if ((variableFor(sourceCode, node)?.defs.length ?? 0) === 0) return Object.hasOwn(FRAMEWORKS, node.name) ? { name: node.name, path: node.name } : undefined
+        for (const { specifier, source } of importsOf(node)) {
+          if (specifier.type !== AST_NODE_TYPES.ImportSpecifier) continue
+          const name = exportedName(specifier.imported)
+          if (Object.hasOwn(FRAMEWORKS, name) && source === FRAMEWORKS[name].source) return { name, path: node.name }
+        }
+        return undefined
+      }
+      if (node.type !== AST_NODE_TYPES.MemberExpression || node.object.type !== AST_NODE_TYPES.Identifier) return undefined
+      const name = staticMemberName(node)
+      if (name === undefined || !Object.hasOwn(FRAMEWORKS, name)) return undefined
+      const namespace = node.object
+      const imported = importsOf(namespace).some(({ specifier, source }) => specifier.type === AST_NODE_TYPES.ImportNamespaceSpecifier && source === FRAMEWORKS[name].source)
+      return imported ? { name, path: `${namespace.name}.${name}` } : undefined
     }
 
     return {
       CallExpression(node) {
         const { callee } = node
-        if (callee.type !== AST_NODE_TYPES.MemberExpression || callee.object.type !== AST_NODE_TYPES.Identifier || !isFramework(callee.object)) return
+        if (callee.type !== AST_NODE_TYPES.MemberExpression) return
+        const framework = frameworkOf(callee.object)
+        if (framework === undefined) return
         const method = staticMemberName(callee)
-        if (method !== undefined && MOCK_METHODS.has(method)) {
-          context.report({ node, messageId: 'moduleMock', data: { call: `${callee.object.name}.${method}` } })
+        if (method !== undefined && FRAMEWORKS[framework.name].methods.has(method)) {
+          context.report({ node, messageId: 'moduleMock', data: { call: `${framework.path}.${method}` } })
         }
       },
     }

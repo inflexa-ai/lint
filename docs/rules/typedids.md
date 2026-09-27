@@ -8,7 +8,7 @@ A typed ID such as `ids.UserID` has its own type. The compiler then rejects a us
 
 ## What the rule reports
 
-- A struct field, a function parameter or a function result of type `uuid.UUID` or `*uuid.UUID` from `github.com/google/uuid`. The rule reports it when its name ends with a typed ID name, for example `RevokedByUserID`. It also reports the unexported form of a typed ID name, for example `userID`.
+- A struct field, a function parameter or a function result of type `uuid.UUID` or `*uuid.UUID` from the standard library package `uuid` or from `github.com/google/uuid`. The rule reports it when its name ends with a typed ID name, for example `RevokedByUserID`. It also reports the unexported form of a typed ID name, for example `userID`.
 - The message names the typed ID with the package name of `ids-package`, for example `ids.UserID`.
 
 The rule needs no import path from the analyzed package to the typed ID package. `inflexa-lint-config` loads `ids-package` from the repository and writes the names into `.golangci.yml`. Thus a package that does not import the typed ID package, for example a provider client, gets the same check. The names are part of `linters.settings`, which is part of the key of the lint cache. Thus a new typed ID makes golangci-lint analyze each package again. When a new typed ID arrives and nobody runs `inflexa-lint-config` again, `inflexa-lint-config -check` fails.

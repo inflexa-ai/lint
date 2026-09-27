@@ -30,7 +30,7 @@ function specifierOf(node: TSESTree.Expression): string | undefined {
  * somebody is working around one of these rules.
  */
 export function moduleSourceVisitors(check: (source: TSESTree.Node, specifier: string) => void): TSESLint.RuleListener {
-  function checkSource(source: TSESTree.Expression) {
+  function checkSource(source: TSESTree.Expression): void {
     const specifier = specifierOf(source)
     if (specifier !== undefined) check(source, specifier)
   }

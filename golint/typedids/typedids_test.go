@@ -13,7 +13,7 @@ func TestAnalyzer(t *testing.T) {
 		IDsPackage: "example.com/svc/kernel/ids",
 		Names:      []string{"UserID", "OrgID"},
 	})
-	analysistest.Run(t, analysistest.TestData(), a, "example.com/svc/provider/acme")
+	analysistest.Run(t, analysistest.TestData(), a, "example.com/svc/provider/acme", "example.com/svc/stduuid")
 }
 
 func TestEmptyNames(t *testing.T) {

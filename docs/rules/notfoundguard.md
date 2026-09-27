@@ -10,7 +10,7 @@ When each error of a lookup becomes a 404 answer, a database outage looks like a
 
 The error test is the innermost `if` statement or `switch` case that makes an error value `e` not `nil` at the call. That is `e != nil` in the true branch, or `e == nil` in the `else` branch. The implication rules below also apply to the error test. Thus `err != nil || m == nil` is no error test, because the call runs also with a `nil` error.
 
-A guard is a call of `errors.Is`, `errors.As` or a function of `guards` that takes `e` as an argument. The guard must be in a condition that holds where the call runs: a condition whose true branch holds the call, or a negated condition whose else branch holds it. The condition is the condition of the error test itself, or an `if` condition or a `switch` case between the error test and the call. A guard in another branch of the same `if` chain does not count.
+A guard call is a call of `errors.Is`, `errors.As`, `errors.AsType` or a function of `guards` that takes `e` as an argument. A guard is a guard call, or a boolean variable that the init statement of the same `if` or of the same `switch` with no tag gets from a guard call, as `ok` in `if _, ok := errors.AsType[*NotFoundError](err); ok`. The guard must be in a condition that holds where the call runs: a condition whose true branch holds the call, or a negated condition whose else branch holds it. The condition is the condition of the error test itself, or an `if` condition or a `switch` case between the error test and the call. A guard in another branch of the same `if` chain does not count.
 
 The condition must make the guard true at the call:
 
@@ -42,6 +42,6 @@ The analyzer knows no path, thus it reads each package. It reports only a `http.
 
 ## Settings
 
-- `guards` — more guard functions, as `<import path>.<name>`. `errors.Is` and `errors.As` are always guards. Default: none.
+- `guards` — more guard functions, as `<import path>.<name>`. `errors.Is`, `errors.As` and `errors.AsType` are always guards. Default: none.
 
 The base configuration names no guard. A repository adds its guards in its overlay.
