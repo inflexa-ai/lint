@@ -139,7 +139,9 @@ describe('the diagnostics of tsc --noEmit', () => {
     }
   })
 
-  it('never names the tsconfig that it makes', async () => {
+  // One run checks each fixture project. On a runner of GitHub Actions it took
+  // 5.8 s, past the default timeout of 5 s.
+  it('never names the tsconfig that it makes', { timeout: 30_000 }, async () => {
     const actual = await runTypecheck({ cwd: root, projects: Object.keys(PROJECTS) })
     expect(actual.output).not.toContain('.inflexa-typecheck')
   })
