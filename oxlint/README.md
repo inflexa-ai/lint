@@ -1,14 +1,17 @@
 # oxlint
 
-The packages below hold the lint rules of Inflexa. oxlint runs them. Each
-package also installs the third-party plugins that it configures, thus one
-dependency gives a repository the full set.
+The packages of this workspace hold the lint rules of Inflexa. oxlint runs the
+rules that read syntax. The command `inflexa-typecheck` runs the rules that read
+types, together with the type check of `tsc --noEmit`. Each oxlint package also
+installs the third-party plugins that it configures, thus one dependency gives a
+repository the full set of oxlint rules.
 
 | Package                           | For                                                                  | Third-party plugins                                                            |
 | --------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | `@inflexa-ai/oxlint-plugin`       | each TypeScript repository                                           | the ESLint rules of `oxlint-plugin-eslint`, and the native vitest rules        |
 | `@inflexa-ai/oxlint-plugin-react` | each React repository, and it includes `@inflexa-ai/oxlint-plugin`   | TanStack Query and Router, Tailwind, React Doctor, Testing Library, Playwright |
 | `@inflexa-ai/oxlint-plugin-solid` | each SolidJS repository, and it includes `@inflexa-ai/oxlint-plugin` | `eslint-plugin-solid`                                                          |
+| `@inflexa-ai/typecheck`           | each TypeScript repository on TypeScript 7                           | none                                                                           |
 
 oxlint runs the rules of ESLint, of typescript-eslint, and of React hooks and
 React Refresh natively. It runs the typed rules of typescript-eslint through
@@ -22,31 +25,29 @@ end-to-end tests. React Doctor comes through the `reactDoctor` option of the `re
 factory. Its capability setting belongs to the root configuration, and oxlint
 reads the settings of the root only.
 
-Three parts of the lint cannot run in oxlint yet:
+Two parts of the lint cannot run in oxlint:
 
-- The rules that read types: `require-abort-signal` and `no-inline-query-key`.
-  oxlint gives a JS plugin no type information. Without it, each rule stops the
-  run with an error.
-- `@typescript-eslint/no-generated-empty-object-type`. tsgolint does not have it
-  in a release yet.
+- The rules that read types: `must-use-result`, `require-abort-signal`,
+  `no-generated-empty-object-type`, and the rules of the React plugin of
+  `inflexa-typecheck`. oxlint gives a JS plugin no type information.
+  `inflexa-typecheck` of `@inflexa-ai/typecheck` runs them on the program of
+  TypeScript 7. Refer to [its README](./typecheck/README.md).
 - The guard of the disable directives. oxlint has no processors, and a rule
   cannot guard the directive that switches it off.
 
-ESLint runs the first two parts, through the `./eslint` export of the TypeScript
-package or of the React package. A Solid repository uses the export of the
-TypeScript package. The command `directive-guard` runs the guard. By default it guards the rules
+The command `directive-guard` runs the guard. By default it guards the rules
 whose names start with `@inflexa-ai/`. `--prefix` replaces that list, and
 `--allow-inline` names a rule that a directive can switch off with a reason.
 
-A repository installs `oxlint`, `oxlint-tsgolint`, `eslint`, and `typescript`
-beside the package. Pin `oxlint` and `oxlint-tsgolint` to exact versions,
-because JS plugins and type-aware rules are not under semver. The Tailwind and
-React Doctor plugins are optional peers. A repository that sets the `tailwind`
-option installs `eslint-plugin-better-tailwindcss`. Its `restrict` list names
-the classes that no component writes, and without the list no class is
-restricted. A repository that sets
-the `reactDoctor` option installs `eslint-plugin-react-doctor`. The repository
-then calls a factory in its own `oxlint.config.ts`:
+A repository installs `oxlint` and `oxlint-tsgolint` beside the oxlint package.
+Pin `oxlint` and `oxlint-tsgolint` to exact versions, because JS plugins and
+type-aware rules are not under semver.
+
+The Tailwind and React Doctor plugins are optional peers. A repository that sets the `tailwind` option installs
+`eslint-plugin-better-tailwindcss`. Its `restrict` list names the classes that
+no component writes, and without the list no class is restricted. A repository
+that sets the `reactDoctor` option installs `eslint-plugin-react-doctor`. The
+repository then calls a factory in its own `oxlint.config.ts`:
 
 ```ts
 import { vitest } from '@inflexa-ai/oxlint-plugin'
@@ -64,26 +65,28 @@ export default react({
 })
 ```
 
-The repository also calls a factory in its own `eslint.config.js`, and applies
-each typed rule to the files that it guards:
+For the typed rules, the repository installs `@inflexa-ai/typecheck` and
+`typescript` 7.0.2. It calls `typecheck()` in its own `typecheck.config.ts`, and
+turns on each typed rule for the files that it guards:
 
-```js
-import { react } from '@inflexa-ai/oxlint-plugin-react/eslint'
+```ts
+import { plugin as react } from '@inflexa-ai/oxlint-plugin-react/typecheck'
+import { typecheck } from '@inflexa-ai/typecheck'
 
-export default [
-  ...react({ tsconfigRootDir: import.meta.dirname }),
-  {
-    files: ['src/**/*.ts'],
-    rules: { '@inflexa-ai/require-abort-signal': ['error', { declaredIn: ['/src/api/'] }] },
-  },
-]
+export default typecheck({
+  plugins: [react],
+  overrides: [{ files: ['src/**'], rules: { 'require-abort-signal': ['error', { declaredIn: ['/src/api/'] }] } }],
+})
 ```
 
 The lint of a repository runs the three tools in this sequence:
 
 ```sh
-oxlint && eslint . && directive-guard
+oxlint && inflexa-typecheck && directive-guard
 ```
+
+`inflexa-typecheck` also gives the diagnostics of `tsc --noEmit`, thus it
+replaces that step of the repository.
 
 A Solid repository calls `solid()` in its `oxlint.config.ts`, and applies the
 rules of the Solid plugin to its own folders:
@@ -114,10 +117,10 @@ the folder of a file, for example the rules for application code, apply only in
 the blocks of the repository. A glob in a package cannot know the layout of each
 repository.
 
-oxlint reads `oxlint-disable` comments, and ESLint reads `eslint-disable`
-comments. Thus a directive for an oxlint rule is an `oxlint-disable`, and a
-directive for a typed rule is an `eslint-disable`. Each tool reports the unused
-directives of its own form.
+Each tool reads its own form of directive. oxlint reads `oxlint-disable`
+comments, and `inflexa-typecheck` reads `typecheck-disable-next-line` comments.
+No tool reads `eslint-disable`, and `directive-guard` reports each one. Each
+tool reports the unused directives of its own form.
 
 A message states the principle. When a rule points at a replacement, the
 repository names its own module in the `hint` option of that rule.
@@ -125,8 +128,9 @@ repository names its own module in the `hint` option of that rule.
 The rules are written in TypeScript. `tsc` builds each package into `dist/`,
 with no comments in the JavaScript and with the doc comments in the
 declarations. The tests run on the TypeScript source, thus a test never runs
-against an old build. oxlint runs the tests of each rule that reads only syntax,
-and ESLint runs the tests of each typed rule.
+against an old build. The RuleTester of oxlint runs the tests of each rule that
+reads only syntax. The rule tester of `@inflexa-ai/typecheck` runs the tests of
+each typed rule.
 
 Run each command from this folder, which is the root of the npm workspace:
 
@@ -139,10 +143,11 @@ npm run format:check
 npm run build
 ```
 
-`npm run lint` lints the packages with their own configuration. It sets the
-`source` condition of Node.js, thus the configuration loads the TypeScript
-source and not an old build. oxfmt formats the workspace, with the settings in
-[`.oxfmtrc.json`](./.oxfmtrc.json).
+`npm run lint` lints the packages with their own configuration: oxlint,
+`inflexa-typecheck` over the tsconfig of each package and of this folder, and
+`directive-guard`. It sets the `source` condition of Node.js, thus the
+configuration loads the TypeScript source and not an old build. oxfmt formats
+the workspace, with the settings in [`.oxfmtrc.json`](./.oxfmtrc.json).
 
 `npm run lint` also runs jscpd with the settings in [`.jscpd.json`](./.jscpd.json).
 jscpd fails when a block of code occurs in more than one place. Put an operation
@@ -150,10 +155,11 @@ that more than one module uses in a shared helper. Then import the helper.
 
 ## Release the npm packages
 
-The packages share one version. Each other package depends on the exact
-version of the TypeScript package, because it imports its helpers. To release,
-set the new version in the `package.json` file of each package and merge the
-change into `main`. Then run the release from this folder:
+The packages share one version. The React and Solid packages depend on the
+exact version of the TypeScript package, because they import its helpers. The
+React package names the typecheck package at the same version as an optional
+peer. To release, set the new version in the `package.json` file of each package
+and merge the change into `main`. Then run the release from this folder:
 
 ```sh
 node scripts/release.mjs            # a dry run
@@ -162,16 +168,18 @@ node scripts/release.mjs --publish  # publish, then tag oxlint-v<version>
 
 The dry run changes nothing outside `.release/`. It runs the checks,
 builds the packages, and stages a clean folder for each package in
-`.release/`. A staged package holds `dist/`, `LICENSE`, and a `package.json`
-with no scripts, no development dependencies, and no `source` condition. The
-dry run then installs the tarballs into a scratch project and runs oxlint with
-them.
+`.release/`. A staged package holds `dist/`, `LICENSE`, `NOTICE` when the
+package has one, and a `package.json` with no scripts, no development
+dependencies, and no `source` condition. The dry run then installs the tarballs
+into a scratch project. It runs oxlint, `inflexa-typecheck` and
+`directive-guard` with them.
 
 `--publish` also publishes each package that npm does not have at that
-version, the TypeScript package first. Then it tags the commit as
-`oxlint-v<version>`. It stops unless the working tree is clean and `HEAD` is
-`origin/main`. A run that stopped halfway can run again. Each rule links to its
-document in [`docs/rules/`](../docs/rules/).
+version, each package after the packages that it depends on: the typecheck
+package, then the TypeScript package, then the React package. Then it tags the
+commit as `oxlint-v<version>`. It stops unless the working tree is clean and
+`HEAD` is `origin/main`. A run that stopped halfway can run again. Each rule
+links to its document in [`docs/rules/`](../docs/rules/).
 
 The workflow `release-oxlint.yml` runs the same script on `main` when a version
 changes. It uses npm trusted publishing, and npm accepts a trusted publisher

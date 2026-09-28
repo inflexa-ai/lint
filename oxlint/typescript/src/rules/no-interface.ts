@@ -1,12 +1,11 @@
-import type { TSESLint, TSESTree } from '@typescript-eslint/utils'
-import { AST_NODE_TYPES } from '@typescript-eslint/utils'
+import type { ESTree, Rule } from '@oxlint/plugins'
 /** Where a later declaration of the same name is meant to merge into the first. */
-function isMergeHome(node: TSESTree.Node): boolean {
-  if (node.type !== AST_NODE_TYPES.TSModuleDeclaration || !node.declare) return false
+function isMergeHome(node: ESTree.Node): boolean {
+  if (node.type !== 'TSModuleDeclaration' || !node.declare) return false
   // An augmented module is named by a string. `declare module Foo` is a
   // namespace written with the other keyword, and a namespace is no reason to
   // reach for `interface`.
-  return node.kind === 'global' || (node.kind === 'module' && node.id.type === AST_NODE_TYPES.Literal)
+  return node.kind === 'global' || (node.kind === 'module' && node.id.type === 'Literal')
 }
 
 /**
@@ -36,7 +35,7 @@ function isMergeHome(node: TSESTree.Node): boolean {
  * Nothing is fixed automatically: the direct form of `interface A extends B`
  * is an intersection, which the message spells out.
  */
-export const noInterface: TSESLint.RuleModule<'interfaceDeclaration'> = {
+export const noInterface: Rule = {
   meta: {
     type: 'suggestion',
     docs: {
@@ -52,7 +51,9 @@ export const noInterface: TSESLint.RuleModule<'interfaceDeclaration'> = {
   create(context) {
     return {
       TSInterfaceDeclaration(node) {
-        if (context.sourceCode.getAncestors(node).some(isMergeHome)) return
+        for (let ancestor: ESTree.Node | null = node.parent; ancestor !== null; ancestor = ancestor.parent) {
+          if (isMergeHome(ancestor)) return
+        }
         // The name rather than the whole declaration, whose body can run long:
         // the keyword is the violation, not any line of the shape itself.
         context.report({ node: node.id, messageId: 'interfaceDeclaration' })

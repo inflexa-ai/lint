@@ -1,15 +1,14 @@
-import { exportedName, isGlobalIdentifier, staticMemberName, variableFor } from '@inflexa-ai/oxlint-plugin/helpers/static-names'
-import { AST_NODE_TYPES, TSESLint } from '@typescript-eslint/utils'
-import type { TSESTree } from '@typescript-eslint/utils'
+import { exportedName, type Identifier, isGlobalIdentifier, staticMemberName, variableFor } from '@inflexa-ai/oxlint-plugin/helpers/static-names'
+import type { ESTree, Rule } from '@oxlint/plugins'
 
-type FunctionNode = TSESTree.ArrowFunctionExpression | TSESTree.FunctionDeclaration | TSESTree.FunctionExpression
+type FunctionNode = ESTree.ArrowFunctionExpression | ESTree.Function
 
 const SUBSCRIPTION_MEMBERS = new Set(['on', 'addEventListener', 'setInterval'])
 const SUBSCRIPTION_GLOBALS = new Set(['addEventListener', 'setInterval'])
 
-function nearestFunction(node: TSESTree.Node): FunctionNode | undefined {
+function nearestFunction(node: ESTree.Node): FunctionNode | undefined {
   for (let current = node.parent; current; current = current.parent) {
-    if (current.type === AST_NODE_TYPES.ArrowFunctionExpression || current.type === AST_NODE_TYPES.FunctionDeclaration || current.type === AST_NODE_TYPES.FunctionExpression) {
+    if (current.type === 'ArrowFunctionExpression' || current.type === 'FunctionDeclaration' || current.type === 'FunctionExpression') {
       return current
     }
   }
@@ -19,13 +18,13 @@ function nearestFunction(node: TSESTree.Node): FunctionNode | undefined {
 /** The own name of a function, and the name of the variable that it initializes. */
 function functionNames(node: FunctionNode): string[] {
   const names: string[] = []
-  if (node.type !== AST_NODE_TYPES.ArrowFunctionExpression && node.id) names.push(node.id.name)
-  if (node.parent.type === AST_NODE_TYPES.VariableDeclarator && node.parent.id.type === AST_NODE_TYPES.Identifier) names.push(node.parent.id.name)
+  if (node.type !== 'ArrowFunctionExpression' && node.id) names.push(node.id.name)
+  if (node.parent.type === 'VariableDeclarator' && node.parent.id.type === 'Identifier') names.push(node.parent.id.name)
   return names
 }
 
-function isJsx(node: TSESTree.Node | null): boolean {
-  return node?.type === AST_NODE_TYPES.JSXElement || node?.type === AST_NODE_TYPES.JSXFragment
+function isJsx(node: ESTree.Node | null): boolean {
+  return node?.type === 'JSXElement' || node?.type === 'JSXFragment'
 }
 
 /**
@@ -34,8 +33,9 @@ function isJsx(node: TSESTree.Node | null): boolean {
  */
 function isComponent(node: FunctionNode): boolean {
   if (functionNames(node).some((name) => /^[A-Z]/.test(name))) return true
-  if (node.body.type !== AST_NODE_TYPES.BlockStatement) return isJsx(node.body)
-  return node.body.body.some((statement) => statement.type === AST_NODE_TYPES.ReturnStatement && isJsx(statement.argument))
+  if (node.body === null) return false
+  if (node.body.type !== 'BlockStatement') return isJsx(node.body)
+  return node.body.body.some((statement) => statement.type === 'ReturnStatement' && isJsx(statement.argument))
 }
 
 /**
@@ -53,7 +53,7 @@ function isComponent(node: FunctionNode): boolean {
  * One `onCleanup` satisfies each subscription of its function, because the rule
  * does not read what the cleanup does.
  */
-export const requireCleanup: TSESLint.RuleModule<'missingCleanup'> = {
+export const requireCleanup: Rule = {
   meta: {
     type: 'problem',
     docs: {
@@ -68,33 +68,33 @@ export const requireCleanup: TSESLint.RuleModule<'missingCleanup'> = {
   },
   create(context) {
     const { sourceCode } = context
-    const subscriptions = new Map<FunctionNode, TSESTree.CallExpression[]>()
+    const subscriptions = new Map<FunctionNode, ESTree.CallExpression[]>()
     const cleaned = new Set<FunctionNode>()
 
     /** The import specifier of solid-js that binds an identifier, where the scope resolves it to one. */
-    function solidImportOf(node: TSESTree.Identifier): TSESTree.Node | undefined {
-      const def = variableFor(sourceCode, node)?.defs.find((candidate) => candidate.type === TSESLint.Scope.DefinitionType.ImportBinding)
-      if (def?.parent.type !== AST_NODE_TYPES.ImportDeclaration || def.parent.source.value !== 'solid-js') return undefined
+    function solidImportOf(node: Identifier): ESTree.Node | undefined {
+      const def = variableFor(sourceCode, node)?.defs.find((candidate) => candidate.type === 'ImportBinding')
+      if (def?.parent?.type !== 'ImportDeclaration' || def.parent.source.value !== 'solid-js') return undefined
       return def.node
     }
 
-    function isSubscription({ callee }: TSESTree.CallExpression): boolean {
-      if (callee.type === AST_NODE_TYPES.MemberExpression) {
+    function isSubscription({ callee }: ESTree.CallExpression): boolean {
+      if (callee.type === 'MemberExpression') {
         const name = staticMemberName(callee)
         if (name === undefined || !SUBSCRIPTION_MEMBERS.has(name)) return false
         // `Solid.on` is the helper of Solid that makes a tracked callback, not an emitter.
-        return callee.object.type !== AST_NODE_TYPES.Identifier || solidImportOf(callee.object)?.type !== AST_NODE_TYPES.ImportNamespaceSpecifier
+        return callee.object.type !== 'Identifier' || solidImportOf(callee.object)?.type !== 'ImportNamespaceSpecifier'
       }
-      return callee.type === AST_NODE_TYPES.Identifier && SUBSCRIPTION_GLOBALS.has(callee.name) && isGlobalIdentifier(sourceCode, callee)
+      return callee.type === 'Identifier' && SUBSCRIPTION_GLOBALS.has(callee.name) && isGlobalIdentifier(sourceCode, callee)
     }
 
-    function isCleanup({ callee }: TSESTree.CallExpression): boolean {
-      if (callee.type === AST_NODE_TYPES.Identifier) {
+    function isCleanup({ callee }: ESTree.CallExpression): boolean {
+      if (callee.type === 'Identifier') {
         const specifier = solidImportOf(callee)
-        return specifier?.type === AST_NODE_TYPES.ImportSpecifier && exportedName(specifier.imported) === 'onCleanup'
+        return specifier?.type === 'ImportSpecifier' && exportedName(specifier.imported) === 'onCleanup'
       }
-      if (callee.type !== AST_NODE_TYPES.MemberExpression || callee.object.type !== AST_NODE_TYPES.Identifier || staticMemberName(callee) !== 'onCleanup') return false
-      return solidImportOf(callee.object)?.type === AST_NODE_TYPES.ImportNamespaceSpecifier
+      if (callee.type !== 'MemberExpression' || callee.object.type !== 'Identifier' || staticMemberName(callee) !== 'onCleanup') return false
+      return solidImportOf(callee.object)?.type === 'ImportNamespaceSpecifier'
     }
 
     function reportMissing(node: FunctionNode): void {

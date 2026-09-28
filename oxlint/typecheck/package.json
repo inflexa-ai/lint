@@ -1,0 +1,55 @@
+{
+  "name": "@inflexa-ai/typecheck",
+  "version": "0.5.0",
+  "description": "The type check of Inflexa on TypeScript 7: the diagnostics of tsc --noEmit and the typed rules in one command.",
+  "keywords": [
+    "typescript",
+    "typecheck",
+    "lint",
+    "neverthrow"
+  ],
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/inflexa-ai/lint.git",
+    "directory": "oxlint/typecheck"
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./rule-tester": {
+      "source": "./src/rule-tester.ts",
+      "types": "./dist/rule-tester.d.ts",
+      "default": "./dist/rule-tester.js"
+    },
+    "./helpers/*": {
+      "source": "./src/helpers/*.ts",
+      "types": "./dist/helpers/*.d.ts",
+      "default": "./dist/helpers/*.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "inflexa-typecheck": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "NOTICE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json --removeComments --declaration false && tsc -p tsconfig.build.json --emitDeclarationOnly",
+    "prepublishOnly": "echo \"Publish through scripts/release.mjs at the root of the workspace, which stages a clean package.\" && exit 1",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "typescript": "7.0.2"
+  }
+}

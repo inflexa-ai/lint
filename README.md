@@ -7,7 +7,7 @@ The shared lint rules of Inflexa, for TypeScript, React, SolidJS and Go.
 
 ## Packages
 
-- [oxlint](./oxlint/README.md): the npm packages `@inflexa-ai/oxlint-plugin`, `@inflexa-ai/oxlint-plugin-react` and `@inflexa-ai/oxlint-plugin-solid`, with the lint rules for TypeScript, React and SolidJS.
+- [oxlint](./oxlint/README.md): the npm packages `@inflexa-ai/oxlint-plugin`, `@inflexa-ai/oxlint-plugin-react`, `@inflexa-ai/oxlint-plugin-solid` and `@inflexa-ai/typecheck`, with the lint rules for TypeScript, React and SolidJS, and the command `inflexa-typecheck` for the rules that read types.
 - [golint](./golint/README.md): the Go module `github.com/inflexa-ai/lint/golint`, with the lint rules for Go as golangci-lint plugins.
 - [docs/rules](./docs/rules/): the principle, the reason and the settings of each rule.
 

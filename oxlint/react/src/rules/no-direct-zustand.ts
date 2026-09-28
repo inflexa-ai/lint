@@ -1,7 +1,8 @@
-import type { TSESLint } from '@typescript-eslint/utils'
+import type { Rule } from '@oxlint/plugins'
 import { moduleSourceVisitors } from '@inflexa-ai/oxlint-plugin/helpers/module-sources'
+import { optionObject, stringOption } from '@inflexa-ai/oxlint-plugin/helpers/rule-options'
 
-/** The options of the rule, once ESLint has merged `meta.defaultOptions` into them. */
+/** The options of the rule, once oxlint has merged `meta.defaultOptions` into them. */
 type Options = { hint: string }
 
 const DEFAULTS: Options = { hint: '' }
@@ -13,7 +14,7 @@ const DEFAULTS: Options = { hint: '' }
  * zustand itself is only imported where that factory lives. Type-only imports
  * are reported too; the factory re-exports the one type a store file needs.
  */
-export const noDirectZustand: TSESLint.RuleModule<'direct', [Partial<Options>]> = {
+export const noDirectZustand: Rule = {
   meta: {
     type: 'problem',
     docs: {
@@ -35,7 +36,7 @@ export const noDirectZustand: TSESLint.RuleModule<'direct', [Partial<Options>]> 
     },
   },
   create(context) {
-    const { hint } = { ...DEFAULTS, ...context.options[0] }
+    const hint = stringOption(optionObject(context.options), 'hint', DEFAULTS.hint)
     return moduleSourceVisitors((source, specifier) => {
       if (/^zustand(\/|$)/.test(specifier)) {
         context.report({ node: source, messageId: 'direct', data: { source: specifier, hint: hint ? ` ${hint}` : '' } })

@@ -6,7 +6,7 @@
 // version that npm does not have yet, and it tags the release as
 // `oxlint-v<version>`.
 import { spawnSync } from 'node:child_process'
-import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -18,8 +18,10 @@ const repositoryRoot = path.resolve(workspace, '..')
 const releaseDir = path.join(workspace, '.release')
 const requireJson = createRequire(import.meta.url)
 
-// The order of publication: each other package depends on the TypeScript package.
-const PACKAGES = ['typescript', 'react', 'solid']
+// The order of publication: each package after the packages that it depends
+// on. The React and Solid packages depend on the TypeScript package, and the
+// React package names the typecheck package as a peer.
+const PACKAGES = ['typecheck', 'typescript', 'react', 'solid']
 
 const { values } = parseArgs({ options: { publish: { type: 'boolean', default: false } } })
 
@@ -101,8 +103,13 @@ for (const { dir, manifest } of packages) {
   cpSync(path.join(workspace, dir, 'dist'), path.join(target, 'dist'), { recursive: true })
   cpSync(path.join(workspace, dir, 'LICENSE'), path.join(target, 'LICENSE'))
   cpSync(path.join(workspace, dir, 'README.md'), path.join(target, 'README.md'))
+  // The notice of the upstream license of a ported rule.
+  const notice = existsSync(path.join(workspace, dir, 'NOTICE'))
+  if (notice) cpSync(path.join(workspace, dir, 'NOTICE'), path.join(target, 'NOTICE'))
 
-  const dependencies = Object.fromEntries(Object.entries(manifest.dependencies ?? {}).map(([name, range]) => [name, scopeNames.has(name) ? version : range]))
+  // A dependency or a peer on a package of this workspace names the shared version.
+  const withSharedVersion = (entries = {}) => Object.fromEntries(Object.entries(entries).map(([name, range]) => [name, scopeNames.has(name) ? version : range]))
+  const dependencies = withSharedVersion(manifest.dependencies)
   const stagedManifest = {
     name: manifest.name,
     version,
@@ -116,21 +123,22 @@ for (const { dir, manifest } of packages) {
   stagedManifest.type = manifest.type
   stagedManifest.exports = withoutSource(manifest.exports)
   if (manifest.bin) stagedManifest.bin = manifest.bin
-  stagedManifest.files = ['dist']
+  stagedManifest.files = notice ? ['dist', 'NOTICE'] : ['dist']
   stagedManifest.engines = { node: '>=22.18.0' }
   stagedManifest.publishConfig = { access: 'public' }
-  stagedManifest.peerDependencies = manifest.peerDependencies
+  stagedManifest.peerDependencies = withSharedVersion(manifest.peerDependencies)
   if (manifest.peerDependenciesMeta) stagedManifest.peerDependenciesMeta = manifest.peerDependenciesMeta
-  stagedManifest.dependencies = dependencies
+  if (Object.keys(dependencies).length > 0) stagedManifest.dependencies = dependencies
   writeFileSync(path.join(target, 'package.json'), `${JSON.stringify(stagedManifest, null, 2)}\n`)
 
   run('npm', ['pack', '--pack-destination', tarballDir], target)
   staged.push({ name: manifest.name, target, tarball: path.join(tarballDir, `${manifest.name.replace('@', '').replace('/', '-')}-${version}.tgz`) })
 }
 
-// The smoke test installs the tarballs as a repository installs them, and runs
+// The smoke test installs the tarballs as a repository installs them, runs
 // oxlint with the factory of the React package and with the factory of the
-// Solid package. It runs outside this repository, because oxlint obeys the
+// Solid package, and runs inflexa-typecheck on a type error and a type that
+// resolves to `{}`. It runs outside this repository, because oxlint obeys the
 // .gitignore that hides `.release/`.
 const smoke = mkdtempSync(path.join(tmpdir(), 'oxlint-release-smoke-'))
 mkdirSync(path.join(smoke, 'src'), { recursive: true })
@@ -138,6 +146,11 @@ writeFileSync(path.join(smoke, 'package.json'), `${JSON.stringify({ name: 'smoke
 writeFileSync(path.join(smoke, '.gitignore'), 'node_modules/\n')
 writeFileSync(path.join(smoke, 'src', 'shape.ts'), 'interface Shape {\n  a: string\n}\n\nexport type Exported = Shape\n')
 writeFileSync(path.join(smoke, 'src', 'view.tsx'), 'export const View = ({ label }: { label: string }): unknown => <text>{label}</text>\n')
+writeFileSync(path.join(smoke, 'src', 'typed.ts'), "export const count: number = 'one'\n\nexport type Rest = Omit<{ a: string }, 'a'>\n")
+writeFileSync(
+  path.join(smoke, 'tsconfig.json'),
+  `${JSON.stringify({ compilerOptions: { strict: true, target: 'es2023', module: 'nodenext', noEmit: true, types: [] }, include: ['src'] }, null, 2)}\n`,
+)
 writeFileSync(
   path.join(smoke, 'oxlint.config.ts'),
   "import { react } from '@inflexa-ai/oxlint-plugin-react'\n\nconst config = react()\n\nexport default { ...config, options: { ...config.options, typeAware: false } }\n",
@@ -156,7 +169,6 @@ run(
     ...staged.map(({ tarball }) => tarball),
     `oxlint@${root.devDependencies.oxlint}`,
     `oxlint-tsgolint@${root.devDependencies['oxlint-tsgolint']}`,
-    `eslint@${root.devDependencies.eslint}`,
     `typescript@${root.devDependencies.typescript}`,
   ],
   smoke,
@@ -167,12 +179,14 @@ const solidLint = capture('npx', ['--no-install', 'oxlint', '-c', 'oxlint.solid.
 if (solidLint.status !== 1 || !solidLint.stdout.includes('@inflexa-ai(no-interface)') || !solidLint.stdout.includes('solid(')) {
   fail(`the smoke run of oxlint with solid() did not report no-interface and a rule of eslint-plugin-solid:\n${solidLint.stdout}\n${solidLint.stderr}`)
 }
-const eslintEntry = capture(
-  'node',
-  ['--input-type=module', '-e', "const { react } = await import('@inflexa-ai/oxlint-plugin-react/eslint'); react({ tsconfigRootDir: process.cwd() })"],
-  smoke,
-)
-if (eslintEntry.status !== 0) fail(`the ESLint entry did not load:\n${eslintEntry.stderr}`)
+const typecheck = capture('npx', ['--no-install', 'inflexa-typecheck'], smoke)
+if (
+  typecheck.status !== 1 ||
+  !typecheck.stdout.includes('src/typed.ts(1,14): error TS2322') ||
+  !typecheck.stdout.includes('src/typed.ts(3,20): error no-generated-empty-object-type')
+) {
+  fail(`the smoke run of inflexa-typecheck did not report the type error and the empty object type:\n${typecheck.stdout}\n${typecheck.stderr}`)
+}
 const guard = capture('npx', ['--no-install', 'directive-guard', 'src'], smoke)
 if (guard.status !== 0) fail(`directive-guard failed:\n${guard.stderr}`)
 rmSync(smoke, { recursive: true, force: true })

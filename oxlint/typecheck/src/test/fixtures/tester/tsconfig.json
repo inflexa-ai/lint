@@ -1,0 +1,4 @@
+{
+  "compilerOptions": { "strict": true, "target": "es2023", "module": "nodenext", "types": [] },
+  "include": ["*.ts"]
+}

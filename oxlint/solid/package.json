@@ -1,13 +1,10 @@
 {
   "name": "@inflexa-ai/oxlint-plugin-solid",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "The oxlint rules and configuration of Inflexa for SolidJS applications.",
   "keywords": [
     "oxlint",
     "oxlint-plugin",
-    "eslint",
-    "eslintplugin",
-    "eslint-plugin",
     "solid",
     "solidjs",
     "typescript"
@@ -45,14 +42,12 @@
     "test": "vitest run"
   },
   "peerDependencies": {
-    "eslint": "^10.0.0",
     "oxlint": "^1.85.0",
-    "oxlint-tsgolint": ">=7.0.2003",
-    "typescript": ">=5.0.0 <6.1.0"
+    "oxlint-tsgolint": ">=7.0.2003"
   },
   "dependencies": {
-    "@inflexa-ai/oxlint-plugin": "^0.4.0",
-    "@typescript-eslint/utils": "^8.70.1",
+    "@inflexa-ai/oxlint-plugin": "^0.5.0",
+    "@oxlint/plugins": "^1.85.0",
     "eslint-plugin-solid": "^0.18.0"
   }
 }

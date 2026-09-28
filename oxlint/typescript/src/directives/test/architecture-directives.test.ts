@@ -11,59 +11,75 @@ const findAllowing = (text: string) => findArchitectureDirectiveViolations(text,
 
 describe('findArchitectureDirectiveViolations', () => {
   it('ignores directives for other rules and prose that only mentions one', () => {
-    expect(find(`// eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only\nrun()`)).toEqual([])
-    expect(find(`/* eslint-disable @typescript-eslint/no-explicit-any -- wire type */`)).toEqual([])
+    expect(find(`// oxlint-disable-next-line react-hooks/exhaustive-deps -- mount-only\nrun()`)).toEqual([])
+    expect(find(`/* oxlint-disable typescript/no-explicit-any -- wire type */`)).toEqual([])
     expect(find(`/* eslint-enable @inflexa-ai/react/no-raw-state */`)).toEqual([])
     expect(find(`// we never disable @inflexa-ai/react/no-raw-state here`)).toEqual([])
     // A longer word that starts the same way is not a directive.
     expect(find(`// eslint-disabled @inflexa-ai/react/no-raw-state`)).toEqual([])
+    expect(find(`// oxlint-disabled @inflexa-ai/react/no-raw-state`)).toEqual([])
   })
 
   it('reports every form of directive that names an architecture rule', () => {
-    expect(find(`// eslint-disable-next-line @inflexa-ai/react/no-raw-state\nx`)).toHaveLength(1)
-    expect(find(`x // eslint-disable-line @inflexa-ai/react/no-raw-effect`)).toHaveLength(1)
-    expect(find(`/* eslint-disable @inflexa-ai/react/no-raw-effect, @inflexa-ai/react/no-raw-context -- "just once" */`)).toHaveLength(2)
-    expect(find(`/* eslint-disable\n  @inflexa-ai/react/store-placement\n*/`)).toHaveLength(1)
-  })
-
-  it('reports the oxlint form of each directive', () => {
     expect(find(`// oxlint-disable-next-line @inflexa-ai/react/no-raw-state\nx`)).toHaveLength(1)
     expect(find(`x // oxlint-disable-line @inflexa-ai/react/no-raw-effect`)).toHaveLength(1)
+    expect(find(`/* oxlint-disable @inflexa-ai/react/no-raw-effect, @inflexa-ai/react/no-raw-context -- "just once" */`)).toHaveLength(2)
+    expect(find(`/* oxlint-disable\n  @inflexa-ai/react/store-placement\n*/`)).toHaveLength(1)
     expect(find(`/* oxlint-disable @inflexa-ai/no-interface */`)).toHaveLength(1)
     expect(find(`/* oxlint-enable @inflexa-ai/no-interface */`)).toEqual([])
   })
 
+  // No tool of this repository reads the ESLint form, so each one is a leftover
+  // that suppresses nothing and misleads the next reader.
+  it.each([
+    ['line', `x // eslint-disable-line no-console`],
+    ['next-line', `// eslint-disable-next-line react-hooks/exhaustive-deps\nrun()`],
+    ['block', `/* eslint-disable no-console */`],
+    ['block over lines', `/* eslint-disable\n  no-console\n*/`],
+    ['rule of another prefix', `// eslint-disable-next-line @typescript-eslint/no-explicit-any\nx`],
+    ['reason', `// eslint-disable-next-line @typescript-eslint/no-explicit-any -- wire type\nx`],
+    ['architecture rule with a reason', `// eslint-disable-next-line @inflexa-ai/test-placement -- the fixture sits beside it\nx`],
+    ['blanket', `/* eslint-disable */`],
+    ['blanket with a reason', `/* eslint-disable -- trust me */`],
+  ])('reports an eslint-disable directive: %s', (_form, text) => {
+    for (const violations of [find(text), findAllowing(text), findArchitectureDirectiveViolations(text, ['acme/'])]) {
+      expect(violations).toHaveLength(1)
+      expect(violations[0].message).toContain('No tool of this repository reads `eslint-disable`')
+    }
+  })
+
+  it('locates an eslint-disable directive where it starts', () => {
+    expect(find(`const a = 1\n  // eslint-disable-next-line no-console\nx`)).toEqual([expect.objectContaining({ line: 2, column: 3 })])
+  })
+
   it('reports only the architecture rule in a mixed list', () => {
-    const violations = find(`// eslint-disable-next-line no-console, @inflexa-ai/react/store-placement`)
+    const violations = find(`// oxlint-disable-next-line no-console, @inflexa-ai/react/store-placement`)
     expect(violations).toHaveLength(1)
     expect(violations[0].message).toContain('`@inflexa-ai/react/store-placement`')
   })
 
-  it.each([`/* eslint-disable */`, `// eslint-disable-next-line\nx`, `/* eslint-disable -- trust me */`, `/* oxlint-disable */`])(
-    'reports a directive that names no rule: %s',
-    (text) => {
-      const violations = find(text)
-      expect(violations).toHaveLength(1)
-      expect(violations[0].message).toContain('blanket')
-    },
-  )
+  it.each([`/* oxlint-disable */`, `// oxlint-disable-next-line\nx`, `/* oxlint-disable -- trust me */`])('reports a directive that names no rule: %s', (text) => {
+    const violations = find(text)
+    expect(violations).toHaveLength(1)
+    expect(violations[0].message).toContain('blanket')
+  })
 
   // Every rule of the plugin is covered by the prefix, so a new one needs no
   // change here to be protected; these two are the type-aware pair, where an
   // inline disable would be the easiest way to make a report go away.
   it.each(['@inflexa-ai/react/require-abort-signal', '@inflexa-ai/react/use-query-signal'])('reports an inline disable of %s', (rule) => {
-    const violations = find(`// eslint-disable-next-line ${rule}\nvoid api.get('/p')`)
+    const violations = find(`// oxlint-disable-next-line ${rule}\nvoid api.get('/p')`)
     expect(violations).toHaveLength(1)
     expect(violations[0].message).toContain(`\`${rule}\``)
   })
 
   it('honours the configured prefixes', () => {
-    expect(findArchitectureDirectiveViolations(`// eslint-disable-next-line acme/no-thing`, ['acme/'])).toHaveLength(1)
-    expect(findArchitectureDirectiveViolations(`// eslint-disable-next-line @inflexa-ai/react/no-raw-state`, ['acme/'])).toEqual([])
+    expect(findArchitectureDirectiveViolations(`// oxlint-disable-next-line acme/no-thing`, ['acme/'])).toHaveLength(1)
+    expect(findArchitectureDirectiveViolations(`// oxlint-disable-next-line @inflexa-ai/react/no-raw-state`, ['acme/'])).toEqual([])
   })
 
   it('locates the directive with 1-based line and column, in source order', () => {
-    const text = `const a = 1\n  // eslint-disable-next-line @inflexa-ai/react/no-raw-state\n/* eslint-disable */`
+    const text = `const a = 1\n  // oxlint-disable-next-line @inflexa-ai/react/no-raw-state\n/* oxlint-disable */`
     expect(find(text).map(({ line, column }) => ({ line, column }))).toEqual([
       { line: 2, column: 3 },
       { line: 3, column: 1 },
@@ -73,12 +89,12 @@ describe('findArchitectureDirectiveViolations', () => {
 
 describe('a rule that may be disabled inline', () => {
   it('accepts every form of directive that names it and gives a reason', () => {
-    expect(findAllowing(`/* eslint-disable @inflexa-ai/test-placement -- the fixture is generated beside it */`)).toEqual([])
-    expect(findAllowing(`// eslint-disable-next-line @inflexa-ai/test-placement -- same\nx`)).toEqual([])
+    expect(findAllowing(`/* oxlint-disable @inflexa-ai/test-placement -- the fixture is generated beside it */`)).toEqual([])
+    expect(findAllowing(`// oxlint-disable-next-line @inflexa-ai/test-placement -- same\nx`)).toEqual([])
   })
 
   it('asks for the reason when the directive gives none', () => {
-    const violations = findAllowing(`/* eslint-disable @inflexa-ai/test-placement */`)
+    const violations = findAllowing(`// oxlint-disable-next-line @inflexa-ai/test-placement\nx`)
     expect(violations).toHaveLength(1)
     expect(violations[0].message).toContain('-- <reason>')
   })
@@ -89,24 +105,24 @@ describe('a rule that may be disabled inline', () => {
   })
 
   it('counts an empty justification as none', () => {
-    expect(findAllowing(`/* eslint-disable @inflexa-ai/test-placement -- */`)).toHaveLength(1)
+    expect(findAllowing(`/* oxlint-disable @inflexa-ai/test-placement -- */`)).toHaveLength(1)
   })
 
   it('judges each rule of a mixed list on its own', () => {
-    const directive = `// eslint-disable-next-line @inflexa-ai/test-placement, @inflexa-ai/react/no-raw-state -- one reason`
+    const directive = `// oxlint-disable-next-line @inflexa-ai/test-placement, @inflexa-ai/react/no-raw-state -- one reason`
     const violations = findAllowing(directive)
     expect(violations).toHaveLength(1)
     expect(violations[0].message).toContain('`@inflexa-ai/react/no-raw-state`')
   })
 
   it('is still covered by a blanket disable, reason or not', () => {
-    const violations = findAllowing(`/* eslint-disable -- every rule, this one included */`)
+    const violations = findAllowing(`/* oxlint-disable -- every rule, this one included */`)
     expect(violations).toHaveLength(1)
     expect(violations[0].message).toContain('blanket')
   })
 
   it('has no exception where none was configured', () => {
-    expect(find(`/* eslint-disable @inflexa-ai/test-placement -- the fixture is generated beside it */`)).toHaveLength(1)
+    expect(find(`/* oxlint-disable @inflexa-ai/test-placement -- the fixture is generated beside it */`)).toHaveLength(1)
   })
 })
 
@@ -118,11 +134,11 @@ describe('checkArchitectureDirectives', () => {
     const files: Record<string, string> = {
       'src/clean.ts': `export const a = 1\n`,
       'src/page.tsx': `const a = 1\n// oxlint-disable-next-line @inflexa-ai/react/no-raw-state\n`,
-      'src/nested/store.js': `/* eslint-disable */\n`,
-      'src/notes.md': `/* eslint-disable */\n`,
-      'src/samples/directive.ts': `/* eslint-disable */\n`,
-      'node_modules/pkg/index.js': `/* eslint-disable */\n`,
-      'dist/index.js': `/* eslint-disable */\n`,
+      'src/nested/store.js': `/* oxlint-disable */\n`,
+      'src/notes.md': `/* oxlint-disable */\n`,
+      'src/samples/directive.ts': `/* oxlint-disable */\n`,
+      'node_modules/pkg/index.js': `/* oxlint-disable */\n`,
+      'dist/index.js': `/* oxlint-disable */\n`,
     }
     for (const [file, text] of Object.entries(files)) {
       await mkdir(path.dirname(path.join(root, file)), { recursive: true })

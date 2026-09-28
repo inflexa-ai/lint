@@ -1,7 +1,8 @@
-import type { TSESLint, TSESTree } from '@typescript-eslint/utils'
+import type { ESTree, Rule } from '@oxlint/plugins'
+import { optionObject, stringsOption } from '../helpers/rule-options.ts'
 import { globalReadOf } from '../helpers/static-names.ts'
 
-/** The options of the rule, once ESLint has merged `meta.defaultOptions` into them. */
+/** The options of the rule, once oxlint has merged `meta.defaultOptions` into them. */
 type Options = { allowIn: string[] }
 
 const DEFAULTS: Options = { allowIn: [] }
@@ -35,7 +36,7 @@ const DEFAULTS: Options = { allowIn: [] }
  * cannot express it yet; covering it now means raising `lib` later does not
  * quietly open a second spelling of the check this rule keeps in one place.
  */
-export const noInstanceofError: TSESLint.RuleModule<'errorCheck', [Partial<Options>]> = {
+export const noInstanceofError: Rule = {
   meta: {
     type: 'suggestion',
     docs: {
@@ -56,13 +57,13 @@ export const noInstanceofError: TSESLint.RuleModule<'errorCheck', [Partial<Optio
     },
   },
   create(context) {
-    const { allowIn } = { ...DEFAULTS, ...context.options[0] }
+    const allowIn = stringsOption(optionObject(context.options), 'allowIn', DEFAULTS.allowIn)
     if (allowIn.some((pattern) => new RegExp(pattern).test(context.filename))) return {}
 
     const { sourceCode } = context
 
     /** The check a node makes, named after the global it reads rather than after its spelling. */
-    function checkAt(node: TSESTree.Node, global: string): boolean {
+    function checkAt(node: ESTree.Node, global: string): boolean {
       return globalReadOf(sourceCode, node)?.name === global
     }
 

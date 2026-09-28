@@ -1,5 +1,4 @@
-import type { TSESLint, TSESTree } from '@typescript-eslint/utils'
-import { AST_NODE_TYPES } from '@typescript-eslint/utils'
+import type { ESTree, Rule } from '@oxlint/plugins'
 import { bareReferenceName, collectTypeAliases, unwrapTransparent } from '../helpers/type-annotations.ts'
 
 // The names a dictionary value must not resolve to. Each gives the reader no
@@ -13,13 +12,13 @@ const UNSAFE: Record<string, string> = {
 }
 
 /** The declarations that give a name to something in this module, which shadows a global of that name. */
-function localNames(program: TSESTree.Program): Set<string> {
+function localNames(program: ESTree.Program): Set<string> {
   const names = new Set<string>()
   for (const statement of program.body) {
-    const declaration = statement.type === AST_NODE_TYPES.ExportNamedDeclaration ? statement.declaration : statement
-    if (declaration?.type === AST_NODE_TYPES.ImportDeclaration) {
+    const declaration = statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement
+    if (declaration?.type === 'ImportDeclaration') {
       for (const specifier of declaration.specifiers) names.add(specifier.local.name)
-    } else if (declaration && 'id' in declaration && declaration.id?.type === AST_NODE_TYPES.Identifier) {
+    } else if (declaration && 'id' in declaration && declaration.id?.type === 'Identifier') {
       names.add(declaration.id.name)
     }
   }
@@ -27,11 +26,11 @@ function localNames(program: TSESTree.Program): Set<string> {
 }
 
 /** The interfaces of this module that declare no member, by name, which stand for the empty object. */
-function emptyInterfaceNames(program: TSESTree.Program): Set<string> {
-  const byName = new Map<string, TSESTree.TSInterfaceDeclaration[]>()
+function emptyInterfaceNames(program: ESTree.Program): Set<string> {
+  const byName = new Map<string, ESTree.TSInterfaceDeclaration[]>()
   for (const statement of program.body) {
-    const declaration = statement.type === AST_NODE_TYPES.ExportNamedDeclaration ? statement.declaration : statement
-    if (declaration?.type === AST_NODE_TYPES.TSInterfaceDeclaration) {
+    const declaration = statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement
+    if (declaration?.type === 'TSInterfaceDeclaration') {
       byName.set(declaration.id.name, [...(byName.get(declaration.id.name) ?? []), declaration])
     }
   }
@@ -58,7 +57,7 @@ function emptyInterfaceNames(program: TSESTree.Program): Set<string> {
  * escape hatch (`Bag<unknown>` for `type Bag<T> = Record<string, T>`). A
  * shadowed `Record` of one's own is left alone: it is not the builtin.
  */
-export const noUnsafeDictionary: TSESLint.RuleModule<'unsafeDictionary'> = {
+export const noUnsafeDictionary: Rule = {
   meta: {
     type: 'problem',
     docs: {
@@ -72,16 +71,16 @@ export const noUnsafeDictionary: TSESLint.RuleModule<'unsafeDictionary'> = {
     },
   },
   create(context) {
-    let aliases = new Map<string, TSESTree.TSTypeAliasDeclaration>()
+    let aliases = new Map<string, ESTree.TSTypeAliasDeclaration>()
     let locals = new Set<string>()
     let emptyInterfaces = new Set<string>()
 
     /** The escape hatch a value type resolves to, or `undefined` when it names a real shape. */
-    function unsafeValue(type: TSESTree.TypeNode, visited = new Set<string>()): string | undefined {
+    function unsafeValue(type: ESTree.TSType, visited = new Set<string>()): string | undefined {
       const resolved = unwrapTransparent(type)
       if (resolved.type in UNSAFE) return UNSAFE[resolved.type]
-      if (resolved.type === AST_NODE_TYPES.TSTypeLiteral) return resolved.members.length === 0 ? 'empty object' : undefined
-      if (resolved.type === AST_NODE_TYPES.TSUnionType) return resolved.types.some((member) => unsafeValue(member, visited)) ? 'union' : undefined
+      if (resolved.type === 'TSTypeLiteral') return resolved.members.length === 0 ? 'empty object' : undefined
+      if (resolved.type === 'TSUnionType') return resolved.types.some((member) => unsafeValue(member, visited)) ? 'union' : undefined
       const name = bareReferenceName(resolved)
       if (name === undefined || visited.has(name)) return undefined
       if (emptyInterfaces.has(name)) return 'empty object'
@@ -91,7 +90,7 @@ export const noUnsafeDictionary: TSESLint.RuleModule<'unsafeDictionary'> = {
     }
 
     /** Reports the value node of a dictionary when its value type is an escape hatch. */
-    function report(valueType: TSESTree.TypeNode): void {
+    function report(valueType: ESTree.TSType): void {
       const value = unsafeValue(valueType)
       if (value !== undefined) context.report({ node: valueType, messageId: 'unsafeDictionary', data: { value } })
     }
@@ -103,12 +102,12 @@ export const noUnsafeDictionary: TSESLint.RuleModule<'unsafeDictionary'> = {
         emptyInterfaces = emptyInterfaceNames(node)
       },
       TSTypeReference(node) {
-        if (node.typeName.type !== AST_NODE_TYPES.Identifier || node.typeName.name !== 'Record' || locals.has('Record')) return
+        if (node.typeName.type !== 'Identifier' || node.typeName.name !== 'Record' || locals.has('Record')) return
         const value = node.typeArguments?.params[1]
         if (value !== undefined) report(value)
       },
       TSTypeLiteral(node) {
-        const indexSignature = node.members.find((member) => member.type === AST_NODE_TYPES.TSIndexSignature)
+        const indexSignature = node.members.find((member) => member.type === 'TSIndexSignature')
         if (indexSignature?.typeAnnotation) report(indexSignature.typeAnnotation.typeAnnotation)
       },
       TSMappedType(node) {

@@ -1,5 +1,4 @@
-import type { TSESLint, TSESTree } from '@typescript-eslint/utils'
-import { AST_NODE_TYPES } from '@typescript-eslint/utils'
+import type { ESTree, Rule } from '@oxlint/plugins'
 import { exportedName, isGlobalIdentifier, staticMemberName } from '../helpers/static-names.ts'
 
 // The zod builders that accept whatever they are given. `z.any()` and
@@ -42,7 +41,7 @@ const ZOD_EXPORT = 'z'
  * followed. Nobody writes it, and chasing it would be a dataflow analysis for a
  * shape that only appears when somebody is working around this rule.
  */
-export const noEmptySchema: TSESLint.RuleModule<'emptySchema'> = {
+export const noEmptySchema: Rule = {
   meta: {
     type: 'problem',
     docs: {
@@ -62,17 +61,17 @@ export const noEmptySchema: TSESLint.RuleModule<'emptySchema'> = {
     const moduleBindings = new Set<string>()
 
     /** Whether an expression is the zod namespace. */
-    function isZod(node: TSESTree.Node): boolean {
-      if (node.type === AST_NODE_TYPES.Identifier) {
+    function isZod(node: ESTree.Node): boolean {
+      if (node.type === 'Identifier') {
         return namespaceBindings.has(node.name) || (node.name === ZOD_EXPORT && isGlobalIdentifier(context.sourceCode, node))
       }
-      if (node.type !== AST_NODE_TYPES.MemberExpression || node.object.type !== AST_NODE_TYPES.Identifier) return false
+      if (node.type !== 'MemberExpression' || node.object.type !== 'Identifier') return false
       return moduleBindings.has(node.object.name) && staticMemberName(node) === ZOD_EXPORT
     }
 
     /** The `z.thing` of a `z.thing(...)` call, or nothing when the callee is shaped otherwise. */
-    function zodBuilder(callee: TSESTree.Expression): string | undefined {
-      if (callee.type !== AST_NODE_TYPES.MemberExpression || !isZod(callee.object)) return undefined
+    function zodBuilder(callee: ESTree.Expression): string | undefined {
+      if (callee.type !== 'MemberExpression' || !isZod(callee.object)) return undefined
       return staticMemberName(callee)
     }
 
@@ -80,12 +79,12 @@ export const noEmptySchema: TSESLint.RuleModule<'emptySchema'> = {
       Program(program) {
         // Collected up front so a call is judged wherever the import sits.
         for (const statement of program.body) {
-          if (statement.type !== AST_NODE_TYPES.ImportDeclaration || typeof statement.source.value !== 'string') continue
+          if (statement.type !== 'ImportDeclaration' || typeof statement.source.value !== 'string') continue
           if (!ZOD_SOURCE.test(statement.source.value)) continue
 
           for (const specifier of statement.specifiers) {
-            if (specifier.type === AST_NODE_TYPES.ImportNamespaceSpecifier) moduleBindings.add(specifier.local.name)
-            else if (specifier.type === AST_NODE_TYPES.ImportSpecifier && exportedName(specifier.imported) === ZOD_EXPORT) namespaceBindings.add(specifier.local.name)
+            if (specifier.type === 'ImportNamespaceSpecifier') moduleBindings.add(specifier.local.name)
+            else if (specifier.type === 'ImportSpecifier' && exportedName(specifier.imported) === ZOD_EXPORT) namespaceBindings.add(specifier.local.name)
           }
         }
       },

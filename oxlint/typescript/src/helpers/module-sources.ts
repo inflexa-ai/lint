@@ -1,5 +1,4 @@
-import type { TSESLint, TSESTree } from '@typescript-eslint/utils'
-import { AST_NODE_TYPES } from '@typescript-eslint/utils'
+import type { ESTree, Visitor } from '@oxlint/plugins'
 
 /**
  * The module a specifier node names, or `undefined` where the specifier is
@@ -10,9 +9,9 @@ import { AST_NODE_TYPES } from '@typescript-eslint/utils'
  * string form, and so does every bundler. A rule that read the string alone
  * would leave a working spelling of the import open.
  */
-function specifierOf(node: TSESTree.Expression): string | undefined {
-  if (node.type === AST_NODE_TYPES.Literal) return typeof node.value === 'string' ? node.value : undefined
-  if (node.type !== AST_NODE_TYPES.TemplateLiteral || node.expressions.length > 0) return undefined
+function specifierOf(node: ESTree.Expression): string | undefined {
+  if (node.type === 'Literal') return typeof node.value === 'string' ? node.value : undefined
+  if (node.type !== 'TemplateLiteral' || node.expressions.length > 0) return undefined
   return node.quasis[0]?.value.cooked ?? undefined
 }
 
@@ -29,8 +28,8 @@ function specifierOf(node: TSESTree.Expression): string | undefined {
  * runs, and a specifier assembled from pieces is a shape that appears only when
  * somebody is working around one of these rules.
  */
-export function moduleSourceVisitors(check: (source: TSESTree.Node, specifier: string) => void): TSESLint.RuleListener {
-  function checkSource(source: TSESTree.Expression): void {
+export function moduleSourceVisitors(check: (source: ESTree.Node, specifier: string) => void): Visitor {
+  function checkSource(source: ESTree.Expression): void {
     const specifier = specifierOf(source)
     if (specifier !== undefined) check(source, specifier)
   }

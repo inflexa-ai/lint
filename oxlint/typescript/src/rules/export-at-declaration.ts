@@ -1,8 +1,5 @@
-import { TSESLint, type TSESTree } from '@typescript-eslint/utils'
-import { AST_NODE_TYPES } from '@typescript-eslint/utils'
-import { variableFor } from '../helpers/static-names.ts'
-
-const { DefinitionType } = TSESLint.Scope
+import type { Definition, ESTree, Range, Rule, Variable } from '@oxlint/plugins'
+import { exportedName, variableFor } from '../helpers/static-names.ts'
 
 // The statements a top-level declaration can be, each of which takes `export`
 // in front of it and means the same thing exported.
@@ -14,10 +11,10 @@ const DECLARATIONS = new Set(['FunctionDeclaration', 'ClassDeclaration', 'Variab
  * a `const a = 1, b = 2` would take its neighbour along, and a name that is not
  * declared at the top of the module has no statement to mark.
  */
-function statementOf(def: TSESLint.Scope.Definition): TSESTree.Node | undefined {
-  const statement = def.type === DefinitionType.Variable ? def.parent : def.node
-  if (!DECLARATIONS.has(statement.type) || statement.parent.type !== AST_NODE_TYPES.Program) return undefined
-  if (statement.type === AST_NODE_TYPES.VariableDeclaration && statement.declarations.length !== 1) return undefined
+function statementOf(def: Definition): ESTree.Node | undefined {
+  const statement = def.type === 'Variable' ? def.parent : def.node
+  if (statement === null || !DECLARATIONS.has(statement.type) || statement.parent?.type !== 'Program') return undefined
+  if (statement.type === 'VariableDeclaration' && statement.declarations.length !== 1) return undefined
   return statement
 }
 
@@ -42,7 +39,7 @@ function statementOf(def: TSESLint.Scope.Definition): TSESTree.Node | undefined 
  * only, when a name is renamed on the way out, is imported, or shares its
  * declaration statement with a name the list does not export.
  */
-export const exportAtDeclaration: TSESLint.RuleModule<'exportList' | 'reExport' | 'defaultIdentifier'> = {
+export const exportAtDeclaration: Rule = {
   meta: {
     type: 'suggestion',
     docs: {
@@ -63,8 +60,13 @@ export const exportAtDeclaration: TSESLint.RuleModule<'exportList' | 'reExport' 
   create(context) {
     const { sourceCode } = context
 
+    /** The variable of a specifier. A string name, as in `export { 'a' as b } from 'm'`, binds no variable. */
+    function variableOf(name: ESTree.ModuleExportName): Variable | undefined {
+      return name.type === 'Identifier' ? variableFor(sourceCode, name) : undefined
+    }
+
     /** The range that deletes a statement together with the blank space before it. */
-    function removalRange(node: TSESTree.Node): TSESLint.AST.Range {
+    function removalRange(node: ESTree.Node): Range {
       const before = sourceCode.getTokenBefore(node, { includeComments: true })
       return [before ? before.range[1] : 0, node.range[1]]
     }
@@ -73,12 +75,12 @@ export const exportAtDeclaration: TSESLint.RuleModule<'exportList' | 'reExport' 
       ExportNamedDeclaration(node) {
         if (node.source || node.declaration) return
 
-        const statements: TSESTree.Node[] = []
+        const statements: ESTree.Node[] = []
         let fixable = true
         for (const specifier of node.specifiers) {
-          const local = specifier.local.name
-          const variable = variableFor(sourceCode, specifier.local)
-          const imported = variable?.defs.find((def) => def.type === DefinitionType.ImportBinding)
+          const local = exportedName(specifier.local)
+          const variable = variableOf(specifier.local)
+          const imported = variable?.defs.find((def) => def.type === 'ImportBinding')
           if (imported) {
             const declaration = imported.parent
             // `import x = require('m')` has no `source`: the module string sits
@@ -86,53 +88,53 @@ export const exportAtDeclaration: TSESLint.RuleModule<'exportList' | 'reExport' 
             // re-export from, so it gets no message, and no list that holds an
             // imported name is fixable, because the alias export cannot move.
             const source =
-              declaration.type === AST_NODE_TYPES.TSImportEqualsDeclaration
-                ? declaration.moduleReference.type === AST_NODE_TYPES.TSExternalModuleReference
-                  ? declaration.moduleReference.expression
-                  : undefined
-                : 'source' in declaration
-                  ? declaration.source
-                  : undefined
+              declaration === null
+                ? undefined
+                : declaration.type === 'TSImportEqualsDeclaration'
+                  ? declaration.moduleReference.type === 'TSExternalModuleReference'
+                    ? declaration.moduleReference.expression
+                    : undefined
+                  : 'source' in declaration
+                    ? declaration.source
+                    : undefined
             if (source) {
               context.report({ node: specifier, messageId: 'reExport', data: { name: local, source: sourceCode.getText(source) } })
             }
             fixable = false
             continue
           }
-          const renamed = specifier.exported.type !== AST_NODE_TYPES.Identifier || specifier.exported.name !== local
+          const renamed = specifier.exported.type !== 'Identifier' || specifier.exported.name !== local
           const found = variable?.defs.map(statementOf) ?? []
           const declared = found.filter((statement) => statement !== undefined)
           if (renamed || found.length === 0 || declared.length < found.length) fixable = false
           else statements.push(...declared)
         }
 
-        const locals = node.specifiers.filter((specifier) => !variableFor(sourceCode, specifier.local)?.defs.some((def) => def.type === DefinitionType.ImportBinding))
+        const locals = node.specifiers.filter((specifier) => !variableOf(specifier.local)?.defs.some((def) => def.type === 'ImportBinding'))
         if (locals.length === 0) return
 
         context.report({
           node,
           messageId: 'exportList',
-          data: { statement: sourceCode.getText(node), first: locals[0].local.name },
-          fix: fixable ? (fixer) => [...new Set(statements)].map((statement) => fixer.insertTextBefore(statement, 'export ')).concat(fixer.removeRange(removalRange(node))) : null,
+          data: { statement: sourceCode.getText(node), first: exportedName(locals[0].local) },
+          fix: fixable
+            ? (fixer) => [...new Set(statements)].map((statement) => fixer.insertTextBefore(statement, 'export ')).concat(fixer.removeRange(removalRange(node)))
+            : undefined,
         })
       },
       ExportDefaultDeclaration(node) {
-        if (node.declaration.type !== AST_NODE_TYPES.Identifier) return
+        if (node.declaration.type !== 'Identifier') return
         const { name } = node.declaration
         const defs = variableFor(sourceCode, node.declaration)?.defs ?? []
         const [only] = defs
         const declaration =
-          defs.length === 1 &&
-          (only.node.type === AST_NODE_TYPES.FunctionDeclaration || only.node.type === AST_NODE_TYPES.ClassDeclaration) &&
-          only.node.parent.type === AST_NODE_TYPES.Program
-            ? only.node
-            : undefined
+          defs.length === 1 && (only.node.type === 'FunctionDeclaration' || only.node.type === 'ClassDeclaration') && only.node.parent.type === 'Program' ? only.node : undefined
 
         context.report({
           node,
           messageId: 'defaultIdentifier',
           data: { name },
-          fix: declaration ? (fixer) => [fixer.insertTextBefore(declaration, 'export default '), fixer.removeRange(removalRange(node))] : null,
+          fix: declaration ? (fixer) => [fixer.insertTextBefore(declaration, 'export default '), fixer.removeRange(removalRange(node))] : undefined,
         })
       },
     }

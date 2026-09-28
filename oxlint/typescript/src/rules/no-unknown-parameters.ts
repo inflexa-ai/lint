@@ -1,24 +1,23 @@
-import type { TSESLint, TSESTree } from '@typescript-eslint/utils'
-import { AST_NODE_TYPES } from '@typescript-eslint/utils'
+import type { ESTree, Rule } from '@oxlint/plugins'
 import { FUNCTIONS, type FunctionLike } from '../helpers/type-annotations.ts'
 
 /** A parameter, and each form that a parameter wraps. */
-type ParameterLike = TSESTree.Parameter | TSESTree.DestructuringPattern
+type ParameterLike = ESTree.ParamPattern | ESTree.BindingPattern
 
 /** The type annotation a parameter carries, seen through a rest, a default or a constructor property. */
-function annotationOf(parameter: ParameterLike): TSESTree.TSTypeAnnotation | undefined {
-  if (parameter.type === AST_NODE_TYPES.TSParameterProperty) return annotationOf(parameter.parameter)
-  if (parameter.type === AST_NODE_TYPES.RestElement) return parameter.typeAnnotation ?? annotationOf(parameter.argument)
-  if (parameter.type === AST_NODE_TYPES.AssignmentPattern) return parameter.typeAnnotation ?? annotationOf(parameter.left)
-  return 'typeAnnotation' in parameter ? parameter.typeAnnotation : undefined
+function annotationOf(parameter: ParameterLike): ESTree.TSTypeAnnotation | undefined {
+  if (parameter.type === 'TSParameterProperty') return annotationOf(parameter.parameter)
+  if (parameter.type === 'RestElement') return parameter.typeAnnotation ?? annotationOf(parameter.argument)
+  if (parameter.type === 'AssignmentPattern') return parameter.typeAnnotation ?? annotationOf(parameter.left)
+  return 'typeAnnotation' in parameter ? (parameter.typeAnnotation ?? undefined) : undefined
 }
 
 /** The name a parameter binds, for the message, seen through the same wrappers. */
 function nameOf(parameter: ParameterLike): string {
-  if (parameter.type === AST_NODE_TYPES.TSParameterProperty) return nameOf(parameter.parameter)
-  if (parameter.type === AST_NODE_TYPES.RestElement) return nameOf(parameter.argument)
-  if (parameter.type === AST_NODE_TYPES.AssignmentPattern) return nameOf(parameter.left)
-  return parameter.type === AST_NODE_TYPES.Identifier ? parameter.name : 'a parameter'
+  if (parameter.type === 'TSParameterProperty') return nameOf(parameter.parameter)
+  if (parameter.type === 'RestElement') return nameOf(parameter.argument)
+  if (parameter.type === 'AssignmentPattern') return nameOf(parameter.left)
+  return parameter.type === 'Identifier' ? parameter.name : 'a parameter'
 }
 
 /**
@@ -34,7 +33,7 @@ function nameOf(parameter: ParameterLike): string {
  * files belong to the consumer repository, so the consumer excludes them from
  * this rule in its own lint config.
  */
-export const noUnknownParameters: TSESLint.RuleModule<'unknownParameter'> = {
+export const noUnknownParameters: Rule = {
   meta: {
     type: 'problem',
     docs: {
@@ -51,7 +50,7 @@ export const noUnknownParameters: TSESLint.RuleModule<'unknownParameter'> = {
     function check(node: FunctionLike): void {
       for (const parameter of node.params) {
         const annotation = annotationOf(parameter)
-        if (annotation?.typeAnnotation.type !== AST_NODE_TYPES.TSUnknownKeyword) continue
+        if (annotation?.typeAnnotation.type !== 'TSUnknownKeyword') continue
         const name = nameOf(parameter)
         if (name === 'cause') continue
         context.report({ node: annotation.typeAnnotation, messageId: 'unknownParameter', data: { name } })

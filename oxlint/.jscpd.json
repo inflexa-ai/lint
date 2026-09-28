@@ -1,7 +1,7 @@
 {
   "path": ["."],
   "format": ["typescript", "javascript"],
-  "ignore": ["**/node_modules/**", "**/dist/**", "**/.release/**"],
+  "ignore": ["**/node_modules/**", "**/dist/**", "**/.release/**", "**/*.d.ts"],
   "minTokens": 50,
   "minLines": 5,
   "exitCode": 1,

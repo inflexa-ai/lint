@@ -50,12 +50,17 @@ Each job of the test workflow and of the release workflows SHALL run on `ubuntu-
 
 ### Requirement: The staged npm package names this repository and links each rule here
 
-The npm release SHALL write the `repository` of the source manifest into each staged manifest, in a local run and in GitHub Actions. That `repository` SHALL name `git+https://github.com/inflexa-ai/lint.git` and the directory of the package under `oxlint/`. Each rule of a staged package SHALL keep the `meta.docs.url` of the source, which names the document of the rule that the `lint-rule-documentation` capability gives. A staged package SHALL hold `dist/`, `LICENSE` and its manifest, and no copy of the rule documents.
+The npm release SHALL stage and publish `@inflexa-ai/typecheck`, `@inflexa-ai/oxlint-plugin`, `@inflexa-ai/oxlint-plugin-react` and `@inflexa-ai/oxlint-plugin-solid` at one shared version, each package after the packages that it depends on. The release SHALL write the `repository` of the source manifest into each staged manifest, in a local run and in GitHub Actions. That `repository` SHALL name `git+https://github.com/inflexa-ai/lint.git` and the directory of the package under `oxlint/`. Each rule of a staged package SHALL keep the `meta.docs.url` of the source, which names the document of the rule that the `lint-rule-documentation` capability gives. A staged package SHALL hold `dist/`, `LICENSE`, its `NOTICE` when the source package has one, and its manifest, and no copy of the rule documents. The release SHALL run when a push to the default branch changes the manifest of any of these packages.
 
 #### Scenario: A local dry run
 
 - **WHEN** a person runs `node scripts/release.mjs` at `oxlint/` outside GitHub Actions
-- **THEN** each staged `package.json` holds `repository` with the URL `git+https://github.com/inflexa-ai/lint.git` and the directory of that package, each rule in the staged `dist/` of the TypeScript and React packages links to `https://github.com/inflexa-ai/lint/blob/main/docs/rules/<rule name>.md`, each rule in the staged `dist/` of the Solid package links to `https://github.com/inflexa-ai/lint/blob/main/docs/rules/solid-<rule name>.md`, and the staged package holds no `docs/` folder
+- **THEN** each staged `package.json` holds `repository` with the URL `git+https://github.com/inflexa-ai/lint.git` and the directory of that package, each rule in the staged `dist/` of the TypeScript and React packages and of `@inflexa-ai/typecheck` links to `https://github.com/inflexa-ai/lint/blob/main/docs/rules/<rule name>.md`, each rule in the staged `dist/` of the Solid package links to `https://github.com/inflexa-ai/lint/blob/main/docs/rules/solid-<rule name>.md`, the staged packages of `@inflexa-ai/typecheck` and `@inflexa-ai/oxlint-plugin-react` hold `NOTICE`, and no staged package holds a `docs/` folder
+
+#### Scenario: The dry run proves the command
+
+- **WHEN** the dry run installs the tarballs into a scratch project with a type error and a type that resolves to `{}`
+- **THEN** `inflexa-typecheck` in the scratch project prints the diagnostic and the report of `no-generated-empty-object-type`, and exits with status 1
 
 ### Requirement: Dependabot updates the dependencies of each package
 
@@ -73,7 +78,7 @@ The npm release SHALL write the `repository` of the source manifest into each st
 #### Scenario: A dry run of the release
 
 - **WHEN** a person runs `node scripts/release.mjs` at `oxlint/`
-- **THEN** `.release/` holds a staged folder and a tarball at version `0.4.0` for `@inflexa-ai/oxlint-plugin`, `@inflexa-ai/oxlint-plugin-react` and `@inflexa-ai/oxlint-plugin-solid`, the staged manifests of the React and Solid packages name `@inflexa-ai/oxlint-plugin` at exactly `0.4.0`, and the smoke run of `solid()` reports `no-interface` and a `solid/*` rule
+- **THEN** `.release/` holds a staged folder and a tarball at version `0.5.0` for `@inflexa-ai/typecheck`, `@inflexa-ai/oxlint-plugin`, `@inflexa-ai/oxlint-plugin-react` and `@inflexa-ai/oxlint-plugin-solid`, the staged manifests of the React and Solid packages name `@inflexa-ai/oxlint-plugin` at exactly `0.5.0`, and the smoke run of `solid()` reports `no-interface` and a `solid/*` rule
 
 #### Scenario: A change of the Solid manifest on the default branch
 

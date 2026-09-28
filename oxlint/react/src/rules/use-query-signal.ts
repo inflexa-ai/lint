@@ -1,28 +1,30 @@
-import type { TSESLint, TSESTree } from '@typescript-eslint/utils'
-import { AST_NODE_TYPES } from '@typescript-eslint/utils'
+import type { ESTree, Reference, Rule, Scope } from '@oxlint/plugins'
+
+/** A property of an object literal or of a destructuring pattern. */
+type Property = ESTree.ObjectProperty | ESTree.BindingProperty
 
 /** The name a key stands for, written plainly or as a literal in brackets. */
-function keyName(key: TSESTree.Node, computed: boolean): string | undefined {
+function keyName(key: ESTree.Node, computed: boolean): string | undefined {
   if (!computed) {
-    if (key.type === AST_NODE_TYPES.Identifier) return key.name
-    return key.type === AST_NODE_TYPES.Literal && typeof key.value === 'string' ? key.value : undefined
+    if (key.type === 'Identifier') return key.name
+    return key.type === 'Literal' && typeof key.value === 'string' ? key.value : undefined
   }
-  return key.type === AST_NODE_TYPES.Literal && typeof key.value === 'string' ? key.value : undefined
+  return key.type === 'Literal' && typeof key.value === 'string' ? key.value : undefined
 }
 
-function propertyFor(pattern: TSESTree.ObjectExpression | TSESTree.ObjectPattern, name: string): TSESTree.Property | undefined {
-  const properties: TSESTree.Node[] = pattern.properties
-  return properties.filter((property) => property.type === AST_NODE_TYPES.Property).find((property) => keyName(property.key, property.computed) === name)
+function propertyFor(pattern: ESTree.ObjectExpression | ESTree.ObjectPattern, name: string): Property | undefined {
+  const properties: (ESTree.ObjectPropertyKind | ESTree.BindingProperty | ESTree.BindingRestElement)[] = pattern.properties
+  return properties.filter((property) => property.type === 'Property').find((property) => keyName(property.key, property.computed) === name)
 }
 
-function hasProperty(object: TSESTree.ObjectExpression | TSESTree.ObjectPattern, name: string): boolean {
+function hasProperty(object: ESTree.ObjectExpression | ESTree.ObjectPattern, name: string): boolean {
   return propertyFor(object, name) !== undefined
 }
 
 /** The local a destructured property binds, seen through a default value. */
-function boundName(property: TSESTree.Property): string | undefined {
-  const bound = property.value.type === AST_NODE_TYPES.AssignmentPattern ? property.value.left : property.value
-  return bound.type === AST_NODE_TYPES.Identifier ? bound.name : undefined
+function boundName(property: Property): string | undefined {
+  const bound = property.value.type === 'AssignmentPattern' ? property.value.left : property.value
+  return bound.type === 'Identifier' ? bound.name : undefined
 }
 
 /**
@@ -32,7 +34,7 @@ function boundName(property: TSESTree.Property): string | undefined {
  * callback nested three deep resolves to the same variable, so reading the
  * signal anywhere inside counts.
  */
-function readsOf(scope: TSESLint.Scope.Scope, name: string): TSESLint.Scope.Reference[] {
+function readsOf(scope: Scope, name: string): Reference[] {
   const variable = scope.variables.find((candidate) => candidate.name === name)
   return variable?.references.filter((reference) => reference.isRead()) ?? []
 }
@@ -46,17 +48,17 @@ function readsOf(scope: TSESLint.Scope.Scope, name: string): TSESLint.Scope.Refe
  * as one that never asked for it. Counting the pattern instead of the reads
  * would call that function correct.
  */
-function readsSignal(parameter: TSESTree.Parameter, scope: TSESLint.Scope.Scope): boolean {
-  if (parameter.type === AST_NODE_TYPES.ObjectPattern) {
+function readsSignal(parameter: ESTree.ParamPattern, scope: Scope): boolean {
+  if (parameter.type === 'ObjectPattern') {
     const property = propertyFor(parameter, 'signal')
     const local = property === undefined ? undefined : boundName(property)
     return local !== undefined && readsOf(scope, local).length > 0
   }
-  if (parameter.type !== AST_NODE_TYPES.Identifier) return false
+  if (parameter.type !== 'Identifier') return false
 
   return readsOf(scope, parameter.name).some((reference) => {
     const parent = reference.identifier.parent
-    return parent.type === AST_NODE_TYPES.MemberExpression && keyName(parent.property, parent.computed) === 'signal'
+    return parent.type === 'MemberExpression' && keyName(parent.property, parent.computed) === 'signal'
   })
 }
 
@@ -89,7 +91,7 @@ function readsSignal(parameter: TSESTree.Parameter, scope: TSESLint.Scope.Scope)
  * function's own leaf: following the name is dataflow, which the compiler
  * already does better.
  */
-export const useQuerySignal: TSESLint.RuleModule<'ignoredSignal'> = {
+export const useQuerySignal: Rule = {
   meta: {
     type: 'problem',
     docs: {
@@ -106,11 +108,10 @@ export const useQuerySignal: TSESLint.RuleModule<'ignoredSignal'> = {
     return {
       Property(node) {
         const queryFn = node.value
-        if (keyName(node.key, node.computed) !== 'queryFn' || (queryFn.type !== AST_NODE_TYPES.ArrowFunctionExpression && queryFn.type !== AST_NODE_TYPES.FunctionExpression))
-          return
+        if (keyName(node.key, node.computed) !== 'queryFn' || (queryFn.type !== 'ArrowFunctionExpression' && queryFn.type !== 'FunctionExpression')) return
 
         const object = node.parent
-        if (object.type !== AST_NODE_TYPES.ObjectExpression || !hasProperty(object, 'queryKey')) return
+        if (object.type !== 'ObjectExpression' || !hasProperty(object, 'queryKey')) return
 
         const parameter = queryFn.params[0]
         if (queryFn.params.length > 0 && readsSignal(parameter, context.sourceCode.getScope(queryFn))) return

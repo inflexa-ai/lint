@@ -25,6 +25,16 @@ The rule asks the compiler which class resolved the method. It matches the class
 
 A rule that matched a receiver named `queryClient` would miss `client`. It would miss the method pulled into a variable of its own. It would report an `invalidateQueries` on an unrelated object.
 
-The rule needs the type information of typescript-eslint. oxlint does not give type information to a JS plugin. Thus ESLint runs this rule, through the configuration of `@inflexa-ai/oxlint-plugin-react/eslint`. Without type information, the rule stops the run with an error. It does not guess from a name.
+The rule needs the type information of the program. oxlint does not give type information to a JS plugin. Thus the command `inflexa-typecheck` of `@inflexa-ai/typecheck` runs this rule, through the typecheck plugin of `@inflexa-ai/oxlint-plugin-react/typecheck`. The id of the rule is `@inflexa-ai/react/no-inline-query-key`:
+
+```ts
+import { plugin as react } from '@inflexa-ai/oxlint-plugin-react/typecheck'
+import { typecheck } from '@inflexa-ai/typecheck'
+
+export default typecheck({
+  plugins: [react],
+  overrides: [{ files: ['src/**'], rules: { '@inflexa-ai/react/no-inline-query-key': 'error' } }],
+})
+```
 
 The library reports the same shape with its own rule, but only on a client that the file declares. An imported client is invisible to it. A route loader and an event handler use an imported client, because those live outside a component and take the shared client of the app. That is the code most likely to reach the cache.

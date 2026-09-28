@@ -1,8 +1,9 @@
-import type { TSESLint } from '@typescript-eslint/utils'
+import type { Rule } from '@oxlint/plugins'
 import path from 'node:path'
 import { moduleSourceVisitors } from '../helpers/module-sources.ts'
+import { optionObject, stringsOption } from '../helpers/rule-options.ts'
 
-/** The options of the rule, once ESLint has merged `meta.defaultOptions` into them. */
+/** The options of the rule, once oxlint has merged `meta.defaultOptions` into them. */
 type Options = { scopes: string[]; workspaces: string[] }
 
 const DEFAULTS: Options = { scopes: [], workspaces: ['packages', 'apps'] }
@@ -67,7 +68,7 @@ function otherWorkspace(workspace: RegExp, file: string, specifier: string): str
  * package may depend on which, are decided elsewhere: in `exports`, and in
  * `@inflexa-ai/react/no-app-concerns`.
  */
-export const packageEntryPoints: TSESLint.RuleModule<'insidePackage' | 'climbsOut', [Partial<Options>]> = {
+export const packageEntryPoints: Rule = {
   meta: {
     type: 'problem',
     docs: {
@@ -95,7 +96,9 @@ export const packageEntryPoints: TSESLint.RuleModule<'insidePackage' | 'climbsOu
     },
   },
   create(context) {
-    const { scopes, workspaces } = { ...DEFAULTS, ...context.options[0] }
+    const options = optionObject(context.options)
+    const scopes = stringsOption(options, 'scopes', DEFAULTS.scopes)
+    const workspaces = stringsOption(options, 'workspaces', DEFAULTS.workspaces)
     const insidePackage = insidePackagePattern(scopes)
     const workspace = workspacePattern(workspaces)
 

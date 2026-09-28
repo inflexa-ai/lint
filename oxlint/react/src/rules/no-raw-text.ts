@@ -1,7 +1,7 @@
-import type { TSESLint, TSESTree } from '@typescript-eslint/utils'
-import { AST_NODE_TYPES } from '@typescript-eslint/utils'
+import type { ESTree, Rule } from '@oxlint/plugins'
+import { optionObject, stringOption } from '@inflexa-ai/oxlint-plugin/helpers/rule-options'
 
-/** The options of the rule, once ESLint has merged `meta.defaultOptions` into them. */
+/** The options of the rule, once oxlint has merged `meta.defaultOptions` into them. */
 type Options = { hint: string }
 
 const DEFAULTS: Options = { hint: '' }
@@ -22,11 +22,11 @@ const READ_ATTRIBUTES = new Set(['alt', 'aria-description', 'aria-label', 'aria-
  * fallback that is one of those. Anything computed is left to the code that
  * computed it.
  */
-function textsOf(node: TSESTree.Node): string[] {
-  if (node.type === AST_NODE_TYPES.Literal) return typeof node.value === 'string' ? [node.value] : []
-  if (node.type === AST_NODE_TYPES.TemplateLiteral) return node.expressions.length === 0 ? [node.quasis[0].value.cooked ?? ''] : []
-  if (node.type === AST_NODE_TYPES.ConditionalExpression) return [...textsOf(node.consequent), ...textsOf(node.alternate)]
-  if (node.type === AST_NODE_TYPES.LogicalExpression) return textsOf(node.right)
+function textsOf(node: ESTree.Node): string[] {
+  if (node.type === 'Literal') return typeof node.value === 'string' ? [node.value] : []
+  if (node.type === 'TemplateLiteral') return node.expressions.length === 0 ? [node.quasis[0].value.cooked ?? ''] : []
+  if (node.type === 'ConditionalExpression') return [...textsOf(node.consequent), ...textsOf(node.alternate)]
+  if (node.type === 'LogicalExpression') return textsOf(node.right)
   return []
 }
 
@@ -46,7 +46,7 @@ function textsOf(node: TSESTree.Node): string[] {
  * review sees a literal there. Tests are outside the rule in oxlint.config.ts,
  * because a test renders a fixture and asserts on its English.
  */
-export const noRawText: TSESLint.RuleModule<'text' | 'attribute', [Partial<Options>]> = {
+export const noRawText: Rule = {
   meta: {
     type: 'problem',
     docs: {
@@ -68,10 +68,10 @@ export const noRawText: TSESLint.RuleModule<'text' | 'attribute', [Partial<Optio
     },
   },
   create(context) {
-    const { hint } = { ...DEFAULTS, ...context.options[0] }
+    const hint = stringOption(optionObject(context.options), 'hint', DEFAULTS.hint)
     const hintText = hint ? ` ${hint}` : ''
 
-    function reportTexts(node: TSESTree.Node, texts: string[], messageId: 'text' | 'attribute', data: Record<string, string> = {}): void {
+    function reportTexts(node: ESTree.Node, texts: string[], messageId: 'text' | 'attribute', data: Record<string, string> = {}): void {
       const text = texts.find((candidate) => LETTER.test(candidate))
       if (text !== undefined) context.report({ node, messageId, data: { ...data, text: text.trim(), hint: hintText } })
     }
@@ -82,12 +82,12 @@ export const noRawText: TSESLint.RuleModule<'text' | 'attribute', [Partial<Optio
       },
       JSXExpressionContainer(node) {
         // A child only. The value of an attribute is read through the attribute below.
-        if (node.parent.type !== AST_NODE_TYPES.JSXElement && node.parent.type !== AST_NODE_TYPES.JSXFragment) return
+        if (node.parent.type !== 'JSXElement' && node.parent.type !== 'JSXFragment') return
         reportTexts(node, textsOf(node.expression), 'text')
       },
       JSXAttribute(node) {
-        if (node.name.type !== AST_NODE_TYPES.JSXIdentifier || !READ_ATTRIBUTES.has(node.name.name) || node.value === null) return
-        const value = node.value.type === AST_NODE_TYPES.JSXExpressionContainer ? node.value.expression : node.value
+        if (node.name.type !== 'JSXIdentifier' || !READ_ATTRIBUTES.has(node.name.name) || node.value === null) return
+        const value = node.value.type === 'JSXExpressionContainer' ? node.value.expression : node.value
         reportTexts(node, textsOf(value), 'attribute', { name: node.name.name })
       },
     }

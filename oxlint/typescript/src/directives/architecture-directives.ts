@@ -20,8 +20,8 @@ export const ARCHITECTURE_RULES = {
   inlineAllowed: ['@inflexa-ai/test-placement'],
 }
 
-// oxlint reads the `oxlint-` form and ESLint reads the `eslint-` form, and each
-// can switch off a rule of this repository.
+// oxlint reads the `oxlint-` form and switches off a rule of this repository.
+// No tool reads the `eslint-` form, which the guard reports whatever it names.
 const LINE_DIRECTIVE = /\/\/[ \t]*((?:es|ox)lint-disable)(?:-next-line|-line)?(?![\w-])([^\n]*)/g
 // A block directive's rule list may wrap across lines.
 const BLOCK_DIRECTIVE = /\/\*\s*((?:es|ox)lint-disable)(?:-next-line|-line)?(?![\w-])([\s\S]*?)\*\//g
@@ -65,6 +65,17 @@ export function findArchitectureDirectiveViolations(text: string, prefixes: stri
   for (const pattern of [LINE_DIRECTIVE, BLOCK_DIRECTIVE]) {
     for (const match of text.matchAll(pattern)) {
       const [, keyword, directive] = match
+      const position = positionAt(text, match.index)
+
+      if (keyword === 'eslint-disable') {
+        violations.push({
+          ...position,
+          message:
+            'No tool of this repository reads `eslint-disable`, so this directive suppresses nothing and misleads the next reader. Write `oxlint-disable` for an oxlint rule or `typecheck-disable-next-line` for a typed rule, with the reason after ` -- `, or remove the directive.',
+        })
+        continue
+      }
+
       // Anything after ` -- ` is the justification, not part of the rule list.
       const [ruleList, ...rest] = directive.split(/\s--(?:\s|$)/)
       const justification = rest.join(' -- ').trim()
@@ -72,7 +83,6 @@ export function findArchitectureDirectiveViolations(text: string, prefixes: stri
         .split(',')
         .map((rule) => rule.trim())
         .filter(Boolean)
-      const position = positionAt(text, match.index)
 
       if (rules.length === 0) {
         violations.push({
