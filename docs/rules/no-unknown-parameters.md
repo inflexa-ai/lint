@@ -13,4 +13,4 @@ A parameter of type `unknown` moves the work of parsing inward. Every caller see
 ## What the rule leaves alone
 
 - A parameter named `cause`. The cause of an error is an arbitrary thrown value by contract, so it stays `unknown` on purpose.
-- The boundary itself. The API client and `extensions/` sit outside this rule in `oxlint.config.ts`. A request body and a value to serialize are `unknown` exactly where data crosses into the program.
+- The boundary itself. A request body and a value to serialize are `unknown` exactly where data crosses into the program. Those boundary files belong to the consumer repository, so the consumer excludes them from this rule in its own lint config.
