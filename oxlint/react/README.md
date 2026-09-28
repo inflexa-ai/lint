@@ -44,7 +44,7 @@ Run the three tools in this sequence:
 oxlint && eslint . && directive-guard
 ```
 
-`directive-guard` comes with `@inflexa-ai/oxlint-plugin`. It reports each disable directive that switches off a rule of the two plugins with no entry in the lint configuration.
+`directive-guard` comes with `@inflexa-ai/oxlint-plugin`. It reports each disable directive that switches off a rule of `@inflexa-ai/` with no entry in the lint configuration.
 
 ## Documentation
 

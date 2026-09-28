@@ -1,0 +1,9 @@
+{
+  "path": ["."],
+  "format": ["typescript", "javascript"],
+  "ignore": ["**/node_modules/**", "**/dist/**", "**/.release/**"],
+  "minTokens": 50,
+  "minLines": 5,
+  "exitCode": 1,
+  "noTips": true
+}

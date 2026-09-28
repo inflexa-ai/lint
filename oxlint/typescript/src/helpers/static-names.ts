@@ -30,7 +30,7 @@ export function exportedName(node: TSESTree.Identifier | TSESTree.Literal): stri
 }
 
 /** The variable an identifier resolves to, looking outward from the scope it sits in. */
-function variableFor(sourceCode: TSESLint.SourceCode, node: TSESTree.Identifier): TSESLint.Scope.Variable | undefined {
+export function variableFor(sourceCode: TSESLint.SourceCode, node: TSESTree.Identifier): TSESLint.Scope.Variable | undefined {
   for (let scope: TSESLint.Scope.Scope | null = sourceCode.getScope(node); scope; scope = scope.upper) {
     const variable = scope.set.get(node.name)
     if (variable) return variable

@@ -9,7 +9,7 @@ export type FileViolation = Violation & { file: string }
 
 /**
  * The rules that no file can switch off in silence: by default, the rules of
- * the two plugins of this workspace, whose names start with `@inflexa-ai/`. The
+ * the plugins of this workspace, whose names start with `@inflexa-ai/`. The
  * command takes other prefixes through `--prefix`, and other rules that can be
  * disabled inline through `--allow-inline`.
  */

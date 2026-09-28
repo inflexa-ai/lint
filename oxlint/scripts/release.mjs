@@ -18,8 +18,8 @@ const repositoryRoot = path.resolve(workspace, '..')
 const releaseDir = path.join(workspace, '.release')
 const requireJson = createRequire(import.meta.url)
 
-// The order of publication: the React package depends on the TypeScript package.
-const PACKAGES = ['typescript', 'react']
+// The order of publication: each other package depends on the TypeScript package.
+const PACKAGES = ['typescript', 'react', 'solid']
 
 const { values } = parseArgs({ options: { publish: { type: 'boolean', default: false } } })
 
@@ -129,16 +129,22 @@ for (const { dir, manifest } of packages) {
 }
 
 // The smoke test installs the tarballs as a repository installs them, and runs
-// oxlint with the factory of the React package. It runs outside this
-// repository, because oxlint obeys the .gitignore that hides `.release/`.
+// oxlint with the factory of the React package and with the factory of the
+// Solid package. It runs outside this repository, because oxlint obeys the
+// .gitignore that hides `.release/`.
 const smoke = mkdtempSync(path.join(tmpdir(), 'oxlint-release-smoke-'))
 mkdirSync(path.join(smoke, 'src'), { recursive: true })
 writeFileSync(path.join(smoke, 'package.json'), `${JSON.stringify({ name: 'smoke', private: true, type: 'module' }, null, 2)}\n`)
 writeFileSync(path.join(smoke, '.gitignore'), 'node_modules/\n')
 writeFileSync(path.join(smoke, 'src', 'shape.ts'), 'interface Shape {\n  a: string\n}\n\nexport type Exported = Shape\n')
+writeFileSync(path.join(smoke, 'src', 'view.tsx'), 'export const View = ({ label }: { label: string }): unknown => <text>{label}</text>\n')
 writeFileSync(
   path.join(smoke, 'oxlint.config.ts'),
   "import { react } from '@inflexa-ai/oxlint-plugin-react'\n\nconst config = react()\n\nexport default { ...config, options: { ...config.options, typeAware: false } }\n",
+)
+writeFileSync(
+  path.join(smoke, 'oxlint.solid.config.ts'),
+  "import { solid } from '@inflexa-ai/oxlint-plugin-solid'\n\nconst config = solid()\n\nexport default { ...config, options: { ...config.options, typeAware: false } }\n",
 )
 const root = requireJson(path.join(workspace, 'package.json'))
 run(
@@ -157,6 +163,10 @@ run(
 )
 const lint = capture('npx', ['--no-install', 'oxlint'], smoke)
 if (lint.status !== 1 || !lint.stdout.includes('@inflexa-ai(no-interface)')) fail(`the smoke run of oxlint did not report no-interface:\n${lint.stdout}\n${lint.stderr}`)
+const solidLint = capture('npx', ['--no-install', 'oxlint', '-c', 'oxlint.solid.config.ts'], smoke)
+if (solidLint.status !== 1 || !solidLint.stdout.includes('@inflexa-ai(no-interface)') || !solidLint.stdout.includes('solid(')) {
+  fail(`the smoke run of oxlint with solid() did not report no-interface and a rule of eslint-plugin-solid:\n${solidLint.stdout}\n${solidLint.stderr}`)
+}
 const eslintEntry = capture(
   'node',
   ['--input-type=module', '-e', "const { react } = await import('@inflexa-ai/oxlint-plugin-react/eslint'); react({ tsconfigRootDir: process.cwd() })"],

@@ -8,11 +8,11 @@ Every published package of this repository states its license where npm reads it
 
 ### Requirement: Published packages declare Apache-2.0
 
-The two published packages, `@inflexa-ai/oxlint-plugin` and `@inflexa-ai/oxlint-plugin-react`, SHALL declare `"license": "Apache-2.0"` in their `package.json`.
+The published packages, `@inflexa-ai/oxlint-plugin`, `@inflexa-ai/oxlint-plugin-react` and `@inflexa-ai/oxlint-plugin-solid`, SHALL declare `"license": "Apache-2.0"` in their `package.json`.
 
 #### Scenario: Each package.json names the license
 
-- **WHEN** a reader opens `oxlint/typescript/package.json` or `oxlint/react/package.json`
+- **WHEN** a reader opens `oxlint/typescript/package.json`, `oxlint/react/package.json` or `oxlint/solid/package.json`
 - **THEN** the `license` field holds `Apache-2.0`
 
 ### Requirement: Each package carries the license text
@@ -21,7 +21,7 @@ Each published package directory SHALL contain a `LICENSE` file with the Apache-
 
 #### Scenario: The license text ships in the tarball
 
-- **WHEN** the package directory of either published package is packed
+- **WHEN** the package directory of a published package is packed
 - **THEN** the tarball contains the `LICENSE` file with the Apache-2.0 text
 
 ### Requirement: The repository carries the license text

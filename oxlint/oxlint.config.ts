@@ -10,7 +10,7 @@ export default typescript({
       // of typescript-eslint to the rule types of ESLint and of oxlint, and the
       // compiler relates none of them, so the SAFETY cast in each needs the
       // `unknown` hop. These files are the whole of the bridge.
-      files: ['typescript/src/plugin.ts', 'react/src/plugin.ts', 'typescript/src/rules/test/rule-tester.ts'],
+      files: ['typescript/src/plugin.ts', 'react/src/plugin.ts', 'solid/src/plugin.ts', 'typescript/src/rules/test/rule-tester.ts'],
       rules: {
         '@inflexa-ai/no-double-cast': 'off',
         'typescript/no-unsafe-type-assertion': 'off',

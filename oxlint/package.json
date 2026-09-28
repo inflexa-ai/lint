@@ -4,16 +4,18 @@
   "type": "module",
   "workspaces": [
     "typescript",
-    "react"
+    "react",
+    "solid"
   ],
   "scripts": {
     "build": "npm run build --workspaces",
     "typecheck": "npm run typecheck --workspaces",
     "test": "npm test --workspaces",
-    "lint": "npm run lint:oxlint && npm run lint:eslint && npm run lint:directives",
+    "lint": "npm run lint:oxlint && npm run lint:eslint && npm run lint:directives && npm run lint:jscpd",
     "lint:oxlint": "NODE_OPTIONS=--conditions=source oxlint",
     "lint:eslint": "NODE_OPTIONS=--conditions=source eslint .",
     "lint:directives": "node --conditions=source typescript/src/directives/cli.ts --ignore \"typescript/src/directives/test/**\" .",
+    "lint:jscpd": "jscpd",
     "format": "oxfmt",
     "format:check": "oxfmt --check"
   },
@@ -21,6 +23,7 @@
     "@types/node": "^24.13.6",
     "@typescript-eslint/rule-tester": "^8.70.1",
     "eslint": "^10.10.0",
+    "jscpd": "5.3.3",
     "oxfmt": "0.70.0",
     "oxlint": "1.85.0",
     "oxlint-tsgolint": "7.0.2003",
