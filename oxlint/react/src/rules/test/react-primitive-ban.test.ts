@@ -14,6 +14,7 @@ ruleTester.run('no-raw-effect', noRawEffect, {
     // Same name, different module: only react's primitives are the concern.
     `import { useEffect } from 'preact/hooks'`,
     `import type { useEffect } from 'react'`,
+    `import type React from 'react'; React.useEffect(() => {}, [])`,
     `const timers = { useEffect() {} }; timers.useEffect()`,
     `import React from 'react'; React.useMemo(() => 1, [])`,
     // A computed name cannot be judged statically; the named forms are what the rule closes.
@@ -41,6 +42,19 @@ ruleTester.run('no-raw-effect', noRawEffect, {
     { code: `export { useEffect } from 'react'`, errors: [banned('useEffect')] },
     { code: `export { useEffect as useSync } from 'react'`, errors: [banned('useEffect')] },
     { code: `export * from 'react'`, errors: [{ messageId: 'reexportAll' as const }] },
+    {
+      code: `import { useEffect, useMemo } from 'react'`,
+      errors: [
+        {
+          message:
+            '`useEffect` from react is not available here. Compute derived values during render, react to a user action in its event handler, load data with TanStack Query, and reset state by changing a `key`. A reusable effect belongs in a named hook, in a file that the configuration of the repository exempts from this rule.',
+        },
+      ],
+    },
+    {
+      code: `export * from 'react'\nexport * from './hooks.ts'`,
+      errors: [{ message: 'Re-exporting everything from react hands out the primitives this rule bans. Export the specific names instead.' }],
+    },
   ],
 })
 
@@ -56,6 +70,15 @@ ruleTester.run('no-raw-state', noRawState, {
       options: [{ names: ['useOptimistic'] }],
       errors: [banned('useOptimistic')],
     },
+    {
+      code: `import { useId, useState } from 'react'`,
+      errors: [
+        {
+          message:
+            "`useState` from react is not available here. In app code each kind of state has one home: server data in TanStack Query; shareable view state (filters, tabs, selection, pagination) in route search params; form fields in a form library; state shared across one feature's components in a store scoped to that feature; an open/close flag in an uncontrolled primitive or a disclosure hook. State owned by a reusable component belongs with that component in its shared package.",
+        },
+      ],
+    },
   ],
 })
 
@@ -67,6 +90,16 @@ ruleTester.run('no-raw-context', noRawContext, {
     {
       code: `import { createContext, useContext } from 'react'`,
       errors: [banned('createContext'), banned('useContext')],
+    },
+    {
+      code: `import { useContext } from 'react'`,
+      options: [{ hint: 'Use createSettledContext from @acme/hooks/create-settled-context.' }],
+      errors: [
+        {
+          message:
+            '`useContext` from react is not available here. Context re-renders every consumer when its value changes, so app code may only use it for a value that is settled before its subtree renders and keeps one identity while mounted, through a context factory of the repository. State that changes belongs in a store. Use createSettledContext from @acme/hooks/create-settled-context.',
+        },
+      ],
     },
   ],
 })

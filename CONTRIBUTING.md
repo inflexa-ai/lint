@@ -21,6 +21,7 @@ The [Code of Conduct](./CODE_OF_CONDUCT.md) applies to each person who takes par
 - Fork the repository and make a branch from `main` in your fork. Then open the pull request from that branch.
 - Keep each pull request to one logical change.
 - Add a test for each change of behavior. A new rule or a changed rule also needs an update to the document of that rule.
+- Keep one copy of each operation. If more than one module uses an operation, put the operation in a shared helper. Then import the helper. The shared helpers of the rules are in `oxlint/typescript/src/helpers/`, and the shared helpers of the tests are in `oxlint/typescript/src/rules/test/`. At `oxlint/`, `npm run lint` runs jscpd, which fails on a copied block of code.
 - Before you push, run the checks of each package that you changed.
 
 ## Developer Certificate of Origin

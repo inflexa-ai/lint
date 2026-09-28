@@ -1,6 +1,6 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { RuleTester as TypedRuleTester, type RunTests } from '@typescript-eslint/rule-tester'
+import { RuleTester as TypedRuleTester, type InvalidTestCase, type RunTests, type TestCaseError, type ValidTestCase } from '@typescript-eslint/rule-tester'
 import type { TSESLint } from '@typescript-eslint/utils'
 import { RuleTester } from 'oxlint/plugins-dev'
 import { afterAll, describe, it } from 'vitest'
@@ -15,9 +15,19 @@ RuleTester.describe = describe
 RuleTester.it = it
 RuleTester.itOnly = it.only
 
+/** An invalid case whose errors name the rendered text of each message, which the oxlint tester compares whole. */
+type MessageTextCase<Options extends readonly unknown[]> = ValidTestCase<Options> & {
+  errors: readonly (Pick<TestCaseError<string>, 'line' | 'column' | 'endLine' | 'endColumn'> & { message: string })[]
+}
+
+/** The cases of a rule, each error by its message id or by its rendered text. */
+type SyntaxTests<MessageIds extends string, Options extends readonly unknown[]> = Omit<RunTests<MessageIds, Options>, 'invalid'> & {
+  invalid: readonly (InvalidTestCase<MessageIds, Options> | MessageTextCase<Options>)[]
+}
+
 /** A tester whose cases the compiler checks against the options and the message ids of the rule. */
 export type SyntaxRuleTester = {
-  run<MessageIds extends string, Options extends readonly unknown[]>(name: string, rule: TSESLint.RuleModule<MessageIds, Options>, tests: RunTests<MessageIds, Options>): void
+  run<MessageIds extends string, Options extends readonly unknown[]>(name: string, rule: TSESLint.RuleModule<MessageIds, Options>, tests: SyntaxTests<MessageIds, Options>): void
 }
 
 /**

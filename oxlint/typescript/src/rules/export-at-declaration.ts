@@ -1,20 +1,12 @@
 import { TSESLint, type TSESTree } from '@typescript-eslint/utils'
 import { AST_NODE_TYPES } from '@typescript-eslint/utils'
+import { variableFor } from '../helpers/static-names.ts'
 
 const { DefinitionType } = TSESLint.Scope
 
 // The statements a top-level declaration can be, each of which takes `export`
 // in front of it and means the same thing exported.
 const DECLARATIONS = new Set(['FunctionDeclaration', 'ClassDeclaration', 'VariableDeclaration', 'TSTypeAliasDeclaration', 'TSInterfaceDeclaration', 'TSEnumDeclaration'])
-
-/** The variable a name resolves to, looking outward from the scope of a node. */
-function variableFor(sourceCode: TSESLint.SourceCode, node: TSESTree.Node, name: string): TSESLint.Scope.Variable | undefined {
-  for (let scope: TSESLint.Scope.Scope | null = sourceCode.getScope(node); scope; scope = scope.upper) {
-    const variable = scope.set.get(name)
-    if (variable) return variable
-  }
-  return undefined
-}
 
 /**
  * The top-level statement that declares a definition, when `export` in front of
@@ -85,7 +77,7 @@ export const exportAtDeclaration: TSESLint.RuleModule<'exportList' | 'reExport' 
         let fixable = true
         for (const specifier of node.specifiers) {
           const local = specifier.local.name
-          const variable = variableFor(sourceCode, node, local)
+          const variable = variableFor(sourceCode, specifier.local)
           const imported = variable?.defs.find((def) => def.type === DefinitionType.ImportBinding)
           if (imported) {
             const declaration = imported.parent
@@ -114,7 +106,7 @@ export const exportAtDeclaration: TSESLint.RuleModule<'exportList' | 'reExport' 
           else statements.push(...declared)
         }
 
-        const locals = node.specifiers.filter((specifier) => !variableFor(sourceCode, node, specifier.local.name)?.defs.some((def) => def.type === DefinitionType.ImportBinding))
+        const locals = node.specifiers.filter((specifier) => !variableFor(sourceCode, specifier.local)?.defs.some((def) => def.type === DefinitionType.ImportBinding))
         if (locals.length === 0) return
 
         context.report({
@@ -127,7 +119,7 @@ export const exportAtDeclaration: TSESLint.RuleModule<'exportList' | 'reExport' 
       ExportDefaultDeclaration(node) {
         if (node.declaration.type !== AST_NODE_TYPES.Identifier) return
         const { name } = node.declaration
-        const defs = variableFor(sourceCode, node, name)?.defs ?? []
+        const defs = variableFor(sourceCode, node.declaration)?.defs ?? []
         const [only] = defs
         const declaration =
           defs.length === 1 &&

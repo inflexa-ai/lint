@@ -1,9 +1,9 @@
 name: Release oxlint packages
 
-# Publishes @inflexa-ai/oxlint-plugin and @inflexa-ai/oxlint-plugin-react when
-# their shared version changes on main. oxlint/scripts/release.mjs does the
-# work, the same script that a person runs locally: it skips each version that
-# npm already has, thus a re-run through workflow_dispatch is safe.
+# Publishes the npm packages of oxlint/ when their shared version changes on
+# main. oxlint/scripts/release.mjs does the work, the same script that a person
+# runs locally: it skips each version that npm already has, thus a re-run
+# through workflow_dispatch is safe.
 #
 # Auth is npm trusted publishing (OIDC). npm accepts a trusted publisher only
 # for a package that exists, thus the first release of each package is local.
@@ -17,6 +17,7 @@ on:
     paths:
       - oxlint/typescript/package.json
       - oxlint/react/package.json
+      - oxlint/solid/package.json
   workflow_dispatch:
 
 permissions:

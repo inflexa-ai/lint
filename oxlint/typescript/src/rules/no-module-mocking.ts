@@ -1,6 +1,6 @@
 import { TSESLint, type TSESTree } from '@typescript-eslint/utils'
 import { AST_NODE_TYPES } from '@typescript-eslint/utils'
-import { exportedName, staticMemberName } from '../helpers/static-names.ts'
+import { exportedName, isGlobalIdentifier, staticMemberName, variableFor } from '../helpers/static-names.ts'
 
 // Each framework object, the module a file imports it from instead of taking
 // it from the test globals, and its calls that replace a whole module with a
@@ -10,15 +10,6 @@ const FRAMEWORKS: Record<string, { source: string; methods: Set<string> }> = {
   vi: { source: 'vitest', methods: JEST_LIKE_METHODS },
   jest: { source: '@jest/globals', methods: JEST_LIKE_METHODS },
   mock: { source: 'bun:test', methods: new Set(['module']) },
-}
-
-/** The variable an identifier resolves to, looking outward from its scope. */
-function variableFor(sourceCode: TSESLint.SourceCode, node: TSESTree.Identifier): TSESLint.Scope.Variable | undefined {
-  for (let scope: TSESLint.Scope.Scope | null = sourceCode.getScope(node); scope; scope = scope.upper) {
-    const variable = scope.set.get(node.name)
-    if (variable) return variable
-  }
-  return undefined
 }
 
 /**
@@ -72,7 +63,7 @@ export const noModuleMocking: TSESLint.RuleModule<'moduleMock'> = {
      */
     function frameworkOf(node: TSESTree.Expression): { name: string; path: string } | undefined {
       if (node.type === AST_NODE_TYPES.Identifier) {
-        if ((variableFor(sourceCode, node)?.defs.length ?? 0) === 0) return Object.hasOwn(FRAMEWORKS, node.name) ? { name: node.name, path: node.name } : undefined
+        if (isGlobalIdentifier(sourceCode, node)) return Object.hasOwn(FRAMEWORKS, node.name) ? { name: node.name, path: node.name } : undefined
         for (const { specifier, source } of importsOf(node)) {
           if (specifier.type !== AST_NODE_TYPES.ImportSpecifier) continue
           const name = exportedName(specifier.imported)
