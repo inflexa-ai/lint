@@ -85,6 +85,12 @@ createRuleTester().run('must-use-result', mustUseResult, {
     `${inflexa}(await loadAsync())._unsafeUnwrapErr()`,
     // A consumer after a chain of transforms.
     { code: `${inflexa}unwrapOrThrow(load().orElse(recover).map(f))\npassGate(check().mapErr(g))`, options: consumers },
+    // A Result assigned to a variable declared earlier, which a later reference uses.
+    `${inflexa}let r: Result<number, Error>\nr = load()\nr.unwrapOr(0)`,
+    // The shape of harness: a `try` block assigns the awaited Result, and a `catch` returns.
+    `${inflexa}declare function loadLater(): Promise<Result<number, Error>>\nasync function main() {\n  let r: Result<number, Error>\n  try {\n    r = await loadLater()\n  } catch {\n    return\n  }\n  if (r.isErr()) return\n}`,
+    // An assignment that reads the variable it assigns, which a later reference uses.
+    `${inflexa}let r = load()\nr = r.map(f)\nr.unwrapOr(0)`,
   ],
   invalid: [
     // only assignment: reported at the expression that gives the value
@@ -140,5 +146,8 @@ createRuleTester().run('must-use-result', mustUseResult, {
     { code: `${inflexa}const r = load()\nunwrapOrThrow(r)`, errors: [MUST_USE] },
     // A function that no option names does not consume the Result.
     { code: `${inflexa}const r = load()\nexternalFunction(r)`, options: consumers, errors: [MUST_USE] },
+    // An assignment to a variable declared earlier that no reference uses.
+    { code: `${inflexa}let r: Result<number, Error>\nr = load()`, errors: [MUST_USE] },
+    { code: `${inflexa}let r: Result<number, Error>\nr = load()\nexternalFunction(r)`, errors: [MUST_USE] },
   ],
 })

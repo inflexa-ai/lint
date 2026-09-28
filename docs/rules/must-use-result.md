@@ -26,7 +26,7 @@ The rule treats a value as used when one of these conditions is true:
 - A `yield*` of the value in the generator function that `safeTry` receives.
 - An element of an array that goes directly into a call that gives a `Result`, for example `Result.combine([a, b])`.
 - An argument of a function that the option `consumers` names, directly or through a chain of `orElse`, `map`, `mapErr` or `andThen` calls.
-- A variable that holds the value, with a reference that uses the value by one of the conditions above.
+- A variable that holds the value, with a reference that uses the value by one of the conditions above. The variable can get the value in its declaration, `const r = getResult()`, or in a later assignment, `r = await getResultAsync()`.
 
 The rule looks through parentheses, `await`, `as`, `!` and `?.` between the value and its use. The rule does not examine a value directly under a type assertion (`as`, `satisfies`, `<T>`) or a non-null assertion. It does not examine the initializer of a class field, because it cannot trace `this.field` to the places that read it.
 
@@ -50,4 +50,4 @@ The command `inflexa-typecheck` of `@inflexa-ai/typecheck` runs the rule on the 
 
 ## Origin
 
-The rule is a port of `must-use-result` of the package `@ninoseki/eslint-plugin-neverthrow` 0.3.2, to the API of TypeScript 7. The upstream package has the MIT license. The `NOTICE` file of `@inflexa-ai/typecheck` holds its copyright and its license text. The port adds the calls of `isOk`, `isErr` and `_unsafeUnwrapErr`, the reads of `error`, `value`, `isOk` and `isErr`, and the option `consumers`.
+The rule is a port of `must-use-result` of the package `@ninoseki/eslint-plugin-neverthrow` 0.3.2, to the API of TypeScript 7. The upstream package has the MIT license. The `NOTICE` file of `@inflexa-ai/typecheck` holds its copyright and its license text. The port adds the calls of `isOk`, `isErr` and `_unsafeUnwrapErr`, the reads of `error`, `value`, `isOk` and `isErr`, the option `consumers`, and the assignment to a variable that is declared earlier.
