@@ -4,10 +4,10 @@ import { moduleSourceVisitors } from '@inflexa-ai/oxlint-plugin/helpers/module-s
 /** The options of the rule, once ESLint has merged `meta.defaultOptions` into them. */
 type Options = { storeFilePattern: string; factorySource?: string; bannedInStores: string[] }
 
+// No default: the module that exports the factory belongs to each repository,
+// and without it the placement half has nothing to find.
 const DEFAULTS: Options = {
   storeFilePattern: '\\.store\\.ts$',
-  // No default: the module that exports the factory belongs to each repository,
-  // and without it the placement half has nothing to find.
   bannedInStores: ['^@tanstack/(react-)?query'],
 }
 

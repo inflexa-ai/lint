@@ -29,10 +29,10 @@ function nameOf(parameter: ParameterLike): string {
  * parsed type states what it needs and trusts it.
  *
  * `cause` is the exception, because an error's cause is an arbitrary thrown
- * value by contract and stays `unknown` on purpose. This is why the boundary
- * itself, the API client and `extensions/`, is outside this rule in
-^ * `oxlint.config.ts`: a request body and a value to serialise are `unknown`
- * exactly where data crosses in.
+ * value by contract and stays `unknown` on purpose. A request body and a value
+ * to serialise are `unknown` exactly where data crosses in; those boundary
+ * files belong to the consumer repository, so the consumer excludes them from
+ * this rule in its own lint config.
  */
 export const noUnknownParameters: TSESLint.RuleModule<'unknownParameter'> = {
   meta: {
