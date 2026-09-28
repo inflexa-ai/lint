@@ -1,13 +1,7 @@
-import type { TSESLint, TSESTree } from '@typescript-eslint/utils'
-import { AST_NODE_TYPES } from '@typescript-eslint/utils'
+import type { ESTree, Rule } from '@oxlint/plugins'
 
 /** The functions that can carry a type guard. */
-type GuardFunction =
-  | TSESTree.FunctionDeclaration
-  | TSESTree.FunctionExpression
-  | TSESTree.ArrowFunctionExpression
-  | TSESTree.TSDeclareFunction
-  | TSESTree.TSEmptyBodyFunctionExpression
+type GuardFunction = ESTree.Function | ESTree.ArrowFunctionExpression
 
 // The selectors of the nodes of `GuardFunction`.
 const FUNCTIONS = ['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression', 'TSDeclareFunction', 'TSEmptyBodyFunctionExpression']
@@ -15,8 +9,8 @@ const FUNCTIONS = ['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionEx
 function functionName(node: GuardFunction): string {
   if (node.id) return node.id.name
   const { parent } = node
-  if (parent.type === AST_NODE_TYPES.VariableDeclarator && parent.id.type === AST_NODE_TYPES.Identifier) return parent.id.name
-  if ((parent.type === AST_NODE_TYPES.Property || parent.type === AST_NODE_TYPES.MethodDefinition) && parent.key.type === AST_NODE_TYPES.Identifier) return parent.key.name
+  if (parent.type === 'VariableDeclarator' && parent.id.type === 'Identifier') return parent.id.name
+  if ((parent.type === 'Property' || parent.type === 'MethodDefinition') && parent.key.type === 'Identifier') return parent.key.name
   return 'This function'
 }
 
@@ -35,7 +29,7 @@ function functionName(node: GuardFunction): string {
  * guard that narrows a known union (`part is ToolCall` out of `ChatPart`) states
  * a fact about types the program already has, and is left alone.
  */
-export const noUnknownTypeGuards: TSESLint.RuleModule<'unknownGuard'> = {
+export const noUnknownTypeGuards: Rule = {
   meta: {
     type: 'suggestion',
     docs: {
@@ -52,14 +46,14 @@ export const noUnknownTypeGuards: TSESLint.RuleModule<'unknownGuard'> = {
     function check(node: GuardFunction): void {
       const { returnType } = node
       const predicate = returnType?.typeAnnotation
-      if (returnType === undefined || predicate?.type !== AST_NODE_TYPES.TSTypePredicate || predicate.parameterName.type !== AST_NODE_TYPES.Identifier) return
+      if (!returnType || predicate?.type !== 'TSTypePredicate' || predicate.parameterName.type !== 'Identifier') return
 
       const { name } = predicate.parameterName
-      const parameter = node.params.filter((param) => param.type === AST_NODE_TYPES.Identifier).find((param) => param.name === name)
+      const parameter = node.params.filter((param) => param.type === 'Identifier').find((param) => param.name === name)
       if (!parameter) return
 
       const type = parameter.typeAnnotation?.typeAnnotation.type
-      if (type === undefined || type === AST_NODE_TYPES.TSUnknownKeyword || type === AST_NODE_TYPES.TSAnyKeyword) {
+      if (type === undefined || type === 'TSUnknownKeyword' || type === 'TSAnyKeyword') {
         context.report({ node: returnType, messageId: 'unknownGuard', data: { name: functionName(node) } })
       }
     }

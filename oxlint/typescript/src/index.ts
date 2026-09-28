@@ -185,8 +185,8 @@ export type TypescriptOptions = {
  * match nothing in a repository with a different layout.
  *
  * Two parts of the lint run outside of it: the rules that read the types of
- * typescript-eslint, through the ESLint configuration of `./eslint`, and the
- * guard of the disable directives, through the command `directive-guard`.
+ * TypeScript, through the command `inflexa-typecheck` of `@inflexa-ai/typecheck`,
+ * and the guard of the disable directives, through the command `directive-guard`.
  */
 export function typescript({
   ignores = [],
@@ -216,9 +216,8 @@ export function typescript({
       typeAware: true,
       // A directive that no longer suppresses anything is a leftover exception.
       reportUnusedDisableDirectives: 'error',
-      // oxlint reads `oxlint-disable` and the ESLint of `./eslint` reads
-      // `eslint-disable`. Otherwise each tool reports the directives for the
-      // rules of the other as unused.
+      // oxlint reads `oxlint-disable` only. No tool reads `eslint-disable`,
+      // and `directive-guard` reports each one.
       respectEslintDisableDirectives: false,
     },
     env: { builtin: true, ...env },

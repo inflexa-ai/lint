@@ -1,5 +1,7 @@
-import type { TSESLint, TSESTree } from '@typescript-eslint/utils'
-import { AST_NODE_TYPES } from '@typescript-eslint/utils'
+import type { ESTree, Scope, SourceCode, Variable } from '@oxlint/plugins'
+
+/** An identifier node, in each of the roles that the AST of oxlint gives it. */
+export type Identifier = Extract<ESTree.Node, { type: 'Identifier' }>
 
 /**
  * The identifiers that each name the global object itself. A member read off
@@ -14,9 +16,9 @@ const GLOBAL_OBJECTS = new Set(['globalThis', 'window', 'self'])
  * brackets, or `undefined` where the name is computed from a value and no
  * reading of the source can say what it is.
  */
-export function staticMemberName(node: TSESTree.MemberExpression): string | undefined {
-  if (!node.computed && node.property.type === AST_NODE_TYPES.Identifier) return node.property.name
-  if (node.property.type === AST_NODE_TYPES.Literal && typeof node.property.value === 'string') return node.property.value
+export function staticMemberName(node: ESTree.MemberExpression): string | undefined {
+  if (!node.computed && node.property.type === 'Identifier') return node.property.name
+  if (node.property.type === 'Literal' && typeof node.property.value === 'string') return node.property.value
   return undefined
 }
 
@@ -25,13 +27,13 @@ export function staticMemberName(node: TSESTree.MemberExpression): string | unde
  * which is what a rule about that module asks. It is not the local name: a
  * rename changes the local and leaves this one alone.
  */
-export function exportedName(node: TSESTree.Identifier | TSESTree.Literal): string {
-  return node.type === AST_NODE_TYPES.Identifier ? node.name : String(node.value)
+export function exportedName(node: ESTree.ModuleExportName): string {
+  return node.type === 'Identifier' ? node.name : node.value
 }
 
 /** The variable an identifier resolves to, looking outward from the scope it sits in. */
-export function variableFor(sourceCode: TSESLint.SourceCode, node: TSESTree.Identifier): TSESLint.Scope.Variable | undefined {
-  for (let scope: TSESLint.Scope.Scope | null = sourceCode.getScope(node); scope; scope = scope.upper) {
+export function variableFor(sourceCode: SourceCode, node: Identifier): Variable | undefined {
+  for (let scope: Scope | null = sourceCode.getScope(node); scope; scope = scope.upper) {
     const variable = scope.set.get(node.name)
     if (variable) return variable
   }
@@ -45,14 +47,14 @@ export function variableFor(sourceCode: TSESLint.SourceCode, node: TSESTree.Iden
  * meaning. A binding somebody wrote — a parameter, an import, a local — is a
  * different thing that happens to share a name, and answers no.
  */
-export function isGlobalIdentifier(sourceCode: TSESLint.SourceCode, node: TSESTree.Identifier): boolean {
+export function isGlobalIdentifier(sourceCode: SourceCode, node: Identifier): boolean {
   return (variableFor(sourceCode, node)?.defs.length ?? 0) === 0
 }
 
 /** The steps of a member chain rooted in a global, outermost last. */
-function pathOf(sourceCode: TSESLint.SourceCode, node: TSESTree.Node): string[] | undefined {
-  if (node.type === AST_NODE_TYPES.Identifier) return isGlobalIdentifier(sourceCode, node) ? [node.name] : undefined
-  if (node.type !== AST_NODE_TYPES.MemberExpression) return undefined
+function pathOf(sourceCode: SourceCode, node: ESTree.Node): string[] | undefined {
+  if (node.type === 'Identifier') return isGlobalIdentifier(sourceCode, node) ? [node.name] : undefined
+  if (node.type !== 'MemberExpression') return undefined
 
   const name = staticMemberName(node)
   if (name === undefined) return undefined
@@ -72,7 +74,7 @@ function pathOf(sourceCode: TSESLint.SourceCode, node: TSESTree.Node): string[] 
  * file. `name` is for the decision, which is about the thing and not about the
  * spelling.
  */
-export function globalReadOf(sourceCode: TSESLint.SourceCode, node: TSESTree.Node): { path: string; name: string } | undefined {
+export function globalReadOf(sourceCode: SourceCode, node: ESTree.Node): { path: string; name: string } | undefined {
   const steps = pathOf(sourceCode, node)
   if (steps === undefined) return undefined
 

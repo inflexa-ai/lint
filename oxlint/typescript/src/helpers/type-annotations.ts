@@ -1,5 +1,4 @@
-import type { TSESTree } from '@typescript-eslint/utils'
-import { AST_NODE_TYPES } from '@typescript-eslint/utils'
+import type { ESTree } from '@oxlint/plugins'
 
 /**
  * Helpers the type-contract rules share. Each one reads a written type
@@ -20,16 +19,13 @@ import { AST_NODE_TYPES } from '@typescript-eslint/utils'
 
 /** The nodes that declare parameters and a return type. */
 export type FunctionLike =
-  | TSESTree.ArrowFunctionExpression
-  | TSESTree.FunctionDeclaration
-  | TSESTree.FunctionExpression
-  | TSESTree.TSDeclareFunction
-  | TSESTree.TSEmptyBodyFunctionExpression
-  | TSESTree.TSCallSignatureDeclaration
-  | TSESTree.TSConstructSignatureDeclaration
-  | TSESTree.TSConstructorType
-  | TSESTree.TSFunctionType
-  | TSESTree.TSMethodSignature
+  | ESTree.ArrowFunctionExpression
+  | ESTree.Function
+  | ESTree.TSCallSignatureDeclaration
+  | ESTree.TSConstructSignatureDeclaration
+  | ESTree.TSConstructorType
+  | ESTree.TSFunctionType
+  | ESTree.TSMethodSignature
 
 /** The selectors of the nodes of `FunctionLike`, for a rule that reads each of them. */
 export const FUNCTIONS = [
@@ -50,9 +46,9 @@ export const FUNCTIONS = [
  * unknown>` is the same dictionary as the one without the word, so a rule that
  * reads the value type has to see through it.
  */
-export function unwrapTransparent(type: TSESTree.TypeNode): TSESTree.TypeNode {
+export function unwrapTransparent(type: ESTree.TSType): ESTree.TSType {
   let current = type
-  while (current.type === AST_NODE_TYPES.TSTypeOperator && current.operator === 'readonly' && current.typeAnnotation !== undefined) {
+  while (current.type === 'TSTypeOperator' && current.operator === 'readonly') {
     current = current.typeAnnotation
   }
   return current
@@ -64,8 +60,8 @@ export function unwrapTransparent(type: TSESTree.TypeNode): TSESTree.TypeNode {
  * would mean substituting the arguments, which these rules do not do, so it is
  * left for the caller to stop at.
  */
-export function bareReferenceName(type: TSESTree.TypeNode): string | undefined {
-  if (type.type !== AST_NODE_TYPES.TSTypeReference || type.typeName.type !== AST_NODE_TYPES.Identifier) return undefined
+export function bareReferenceName(type: ESTree.TSType): string | undefined {
+  if (type.type !== 'TSTypeReference' || type.typeName.type !== 'Identifier') return undefined
   const args = type.typeArguments
   return args && args.params.length > 0 ? undefined : type.typeName.name
 }
@@ -75,11 +71,11 @@ export function bareReferenceName(type: TSESTree.TypeNode): string | undefined {
  * caller can see that a name is declared and decline to follow it rather than
  * mistake it for one from another file.
  */
-export function collectTypeAliases(program: TSESTree.Program): Map<string, TSESTree.TSTypeAliasDeclaration> {
-  const aliases = new Map<string, TSESTree.TSTypeAliasDeclaration>()
+export function collectTypeAliases(program: ESTree.Program): Map<string, ESTree.TSTypeAliasDeclaration> {
+  const aliases = new Map<string, ESTree.TSTypeAliasDeclaration>()
   for (const statement of program.body) {
-    const declaration = statement.type === AST_NODE_TYPES.ExportNamedDeclaration ? statement.declaration : statement
-    if (declaration?.type === AST_NODE_TYPES.TSTypeAliasDeclaration) aliases.set(declaration.id.name, declaration)
+    const declaration = statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement
+    if (declaration?.type === 'TSTypeAliasDeclaration') aliases.set(declaration.id.name, declaration)
   }
   return aliases
 }
@@ -90,9 +86,9 @@ export function collectTypeAliases(program: TSESTree.Program): Map<string, TSEST
  * module alias of the same name, so a rule that follows aliases must not follow
  * a name a `<T>` nearer the node already took.
  */
-export function enclosingTypeParameterNames(node: TSESTree.Node): Set<string> {
+export function enclosingTypeParameterNames(node: ESTree.Node): Set<string> {
   const names = new Set<string>()
-  for (let current: TSESTree.Node = node; current.type !== AST_NODE_TYPES.Program; current = current.parent) {
+  for (let current: ESTree.Node = node; current.type !== 'Program'; current = current.parent) {
     const parameters = 'typeParameters' in current ? current.typeParameters?.params : undefined
     for (const parameter of parameters ?? []) names.add(parameter.name.name)
   }

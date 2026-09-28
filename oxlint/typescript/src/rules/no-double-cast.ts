@@ -1,5 +1,4 @@
-import type { TSESLint, TSESTree } from '@typescript-eslint/utils'
-import { AST_NODE_TYPES } from '@typescript-eslint/utils'
+import type { ESTree, Rule } from '@oxlint/plugins'
 const ESCAPE_TYPES = new Set(['TSUnknownKeyword', 'TSAnyKeyword'])
 
 /**
@@ -12,7 +11,7 @@ const ESCAPE_TYPES = new Set(['TSUnknownKeyword', 'TSAnyKeyword'])
  * schema. A wrong declaration is corrected. A test double is built to satisfy
  * the type, or typed as the narrower thing the test needs.
  */
-export const noDoubleCast: TSESLint.RuleModule<'doubleCast'> = {
+export const noDoubleCast: Rule = {
   meta: {
     type: 'problem',
     docs: {
@@ -26,13 +25,13 @@ export const noDoubleCast: TSESLint.RuleModule<'doubleCast'> = {
     },
   },
   create(context) {
-    function check(node: TSESTree.TSAsExpression | TSESTree.TSTypeAssertion): void {
+    function check(node: ESTree.TSAsExpression | ESTree.TSTypeAssertion): void {
       const inner = node.expression
-      if ((inner.type !== AST_NODE_TYPES.TSAsExpression && inner.type !== AST_NODE_TYPES.TSTypeAssertion) || !ESCAPE_TYPES.has(inner.typeAnnotation.type)) return
+      if ((inner.type !== 'TSAsExpression' && inner.type !== 'TSTypeAssertion') || !ESCAPE_TYPES.has(inner.typeAnnotation.type)) return
       context.report({
         node,
         messageId: 'doubleCast',
-        data: { via: inner.typeAnnotation.type === AST_NODE_TYPES.TSAnyKeyword ? 'any' : 'unknown' },
+        data: { via: inner.typeAnnotation.type === 'TSAnyKeyword' ? 'any' : 'unknown' },
       })
     }
 

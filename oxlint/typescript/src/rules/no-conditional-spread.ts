@@ -1,25 +1,19 @@
-import type { TSESLint, TSESTree } from '@typescript-eslint/utils'
-import { AST_NODE_TYPES } from '@typescript-eslint/utils'
+import type { ESTree, Rule } from '@oxlint/plugins'
 
-function unwrap(node: TSESTree.Expression): TSESTree.Expression {
+function unwrap(node: ESTree.Expression): ESTree.Expression {
   let current = node
-  while (
-    current.type === AST_NODE_TYPES.TSAsExpression ||
-    current.type === AST_NODE_TYPES.TSSatisfiesExpression ||
-    current.type === AST_NODE_TYPES.TSNonNullExpression ||
-    current.type === AST_NODE_TYPES.TSTypeAssertion
-  ) {
+  while (current.type === 'TSAsExpression' || current.type === 'TSSatisfiesExpression' || current.type === 'TSNonNullExpression' || current.type === 'TSTypeAssertion') {
     current = current.expression
   }
   return current
 }
 
-function isEmptyObject(node: TSESTree.Node): boolean {
-  return node.type === AST_NODE_TYPES.ObjectExpression && node.properties.length === 0
+function isEmptyObject(node: ESTree.Node): boolean {
+  return node.type === 'ObjectExpression' && node.properties.length === 0
 }
 
-function isNothing(node: TSESTree.Node): boolean {
-  return isEmptyObject(node) || (node.type === AST_NODE_TYPES.Identifier && node.name === 'undefined') || (node.type === AST_NODE_TYPES.Literal && node.value === null)
+function isNothing(node: ESTree.Node): boolean {
+  return isEmptyObject(node) || (node.type === 'Identifier' && node.name === 'undefined') || (node.type === 'Literal' && node.value === null)
 }
 
 /**
@@ -38,7 +32,7 @@ function isNothing(node: TSESTree.Node): boolean {
  * Array spreads are left alone: `[...(condition ? [item] : [])]` has no direct
  * form to fall back on.
  */
-export const noConditionalSpread: TSESLint.RuleModule<'conditional' | 'emptyFallback'> = {
+export const noConditionalSpread: Rule = {
   meta: {
     type: 'suggestion',
     docs: {
@@ -56,9 +50,9 @@ export const noConditionalSpread: TSESLint.RuleModule<'conditional' | 'emptyFall
     const { sourceCode } = context
 
     /** The inside of the object literal the conditional would spread, when there is exactly one and it is short. */
-    function directForm(branches: TSESTree.Expression[]): string {
+    function directForm(branches: ESTree.Expression[]): string {
       const objects = branches.map(unwrap)
-      const filled = objects.filter((branch) => branch.type === AST_NODE_TYPES.ObjectExpression).filter((object) => object.properties.length > 0)
+      const filled = objects.filter((branch) => branch.type === 'ObjectExpression').filter((object) => object.properties.length > 0)
       if (filled.length !== 1 || !objects.every((branch) => branch === filled[0] || isNothing(branch))) return ''
 
       const { properties } = filled[0]
@@ -68,10 +62,10 @@ export const noConditionalSpread: TSESLint.RuleModule<'conditional' | 'emptyFall
       return text.length <= 80 && !text.includes('\n') ? ` Here that is \`${text}\`.` : ''
     }
 
-    function check(spread: TSESTree.SpreadElement | TSESTree.JSXSpreadAttribute): void {
+    function check(spread: ESTree.SpreadElement | ESTree.JSXSpreadAttribute): void {
       const argument = unwrap(spread.argument)
 
-      if (argument.type === AST_NODE_TYPES.ConditionalExpression) {
+      if (argument.type === 'ConditionalExpression') {
         context.report({
           node: spread,
           messageId: 'conditional',
@@ -80,7 +74,7 @@ export const noConditionalSpread: TSESLint.RuleModule<'conditional' | 'emptyFall
         return
       }
 
-      if (argument.type !== AST_NODE_TYPES.LogicalExpression) return
+      if (argument.type !== 'LogicalExpression') return
 
       if (argument.operator === '&&') {
         context.report({ node: spread, messageId: 'conditional', data: { direct: directForm([argument.right]) } })

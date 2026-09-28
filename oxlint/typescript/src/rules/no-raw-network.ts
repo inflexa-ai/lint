@@ -1,8 +1,8 @@
-import type { TSESLint, TSESTree } from '@typescript-eslint/utils'
-import { AST_NODE_TYPES } from '@typescript-eslint/utils'
+import type { ESTree, Reference, Rule } from '@oxlint/plugins'
+import { optionObject, stringOption, stringsOption } from '../helpers/rule-options.ts'
 import { globalReadOf } from '../helpers/static-names.ts'
 
-/** The options of the rule, once ESLint has merged `meta.defaultOptions` into them. */
+/** The options of the rule, once oxlint has merged `meta.defaultOptions` into them. */
 type Options = { globals: string[]; navigatorMethods: string[]; hint: string }
 
 const DEFAULTS: Options = {
@@ -28,7 +28,7 @@ const DEFAULTS: Options = {
  * followed: `const g = globalThis` is not a shape anyone writes, and the
  * reference that copies `fetch` itself is already reported where it is made.
  */
-export const noRawNetwork: TSESLint.RuleModule<'rawNetwork', [Partial<Options>]> = {
+export const noRawNetwork: Rule = {
   meta: {
     type: 'problem',
     docs: {
@@ -54,20 +54,23 @@ export const noRawNetwork: TSESLint.RuleModule<'rawNetwork', [Partial<Options>]>
     },
   },
   create(context) {
-    const { globals, navigatorMethods, hint } = { ...DEFAULTS, ...context.options[0] }
+    const options = optionObject(context.options)
+    const globals = stringsOption(options, 'globals', DEFAULTS.globals)
+    const navigatorMethods = stringsOption(options, 'navigatorMethods', DEFAULTS.navigatorMethods)
+    const hint = stringOption(options, 'hint', DEFAULTS.hint)
     const hintText = hint ? ` ${hint}` : ''
     const bannedGlobals = new Set(globals)
     // A navigator method is named from the object it hangs off, which is the
     // name `globalReadOf` gives it whatever the call was qualified with.
     const banned = new Set([...globals, ...navigatorMethods.map((method) => `navigator.${method}`)])
 
-    function report(node: TSESTree.Node, name: string): void {
+    function report(node: ESTree.Node, name: string): void {
       context.report({ node, messageId: 'rawNetwork', data: { name, hint: hintText } })
     }
 
-    function reportReference(reference: TSESLint.Scope.Reference): void {
+    function reportReference(reference: Reference): void {
       // `typeof fetch` in a type position names the type, it does not call anything.
-      if (reference.identifier.parent.type === AST_NODE_TYPES.TSTypeQuery) return
+      if (reference.identifier.parent.type === 'TSTypeQuery') return
       report(reference.identifier, reference.identifier.name)
     }
 

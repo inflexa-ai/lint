@@ -1,13 +1,12 @@
-import type { TSESLint, TSESTree } from '@typescript-eslint/utils'
-import { AST_NODE_TYPES } from '@typescript-eslint/utils'
+import type { ESTree, Rule } from '@oxlint/plugins'
 const EQUALITY = new Set(['===', '!==', '==', '!='])
 
-function isTypeof(node: TSESTree.Node): boolean {
-  return node.type === AST_NODE_TYPES.UnaryExpression && node.operator === 'typeof'
+function isTypeof(node: ESTree.Node): boolean {
+  return node.type === 'UnaryExpression' && node.operator === 'typeof'
 }
 
-function isObjectLiteral(node: TSESTree.Node): boolean {
-  return node.type === AST_NODE_TYPES.Literal && node.value === 'object'
+function isObjectLiteral(node: ESTree.Node): boolean {
+  return node.type === 'Literal' && node.value === 'object'
 }
 
 /**
@@ -20,7 +19,7 @@ function isObjectLiteral(node: TSESTree.Node): boolean {
  * an unknown value starts. `typeof x === 'string'` and its kin usually narrow a
  * union the program already knows, which is ordinary TypeScript.
  */
-export const noTypeofObject: TSESLint.RuleModule<'typeofObject'> = {
+export const noTypeofObject: Rule = {
   meta: {
     type: 'suggestion',
     docs: {

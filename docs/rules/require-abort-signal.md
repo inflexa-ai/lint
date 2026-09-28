@@ -20,7 +20,15 @@ The rule knows a call by where its signature is declared, not by the name of the
 
 A `fetch` is known by the name of its declaration in a declaration file. The platform, a polyfill and a library all share the name and the shape, and each honours a `signal`.
 
-The rule needs the type information of typescript-eslint. oxlint does not give type information to a JS plugin. Thus ESLint runs this rule, through the configuration of `@inflexa-ai/oxlint-plugin/eslint`. Without type information, the rule stops the run with an error. It does not guess from a name.
+The rule needs the type information of the program. oxlint does not give type information to a JS plugin. Thus the command `inflexa-typecheck` of `@inflexa-ai/typecheck` runs this rule on the program of each project. The id of the rule is `require-abort-signal`. Turn it on for the files of the app in the `overrides` of `typecheck.config.ts`, with its options:
+
+```ts
+import { typecheck } from '@inflexa-ai/typecheck'
+
+export default typecheck({
+  overrides: [{ files: ['src/**'], rules: { 'require-abort-signal': ['error', { declaredIn: ['/src/api/'] }] } }],
+})
+```
 
 ## What the rule leaves alone
 
@@ -28,4 +36,4 @@ The rule needs the type information of typescript-eslint. oxlint does not give t
 
 ## Options
 
-- `declaredIn` — the files that declare the functions of the client, as regular expressions. Default: `[]`. With no file named, the rule reports nothing.
+- `declaredIn` — the files that declare the functions of the client, as regular expressions. The rule tests each expression on the file name of the declaration, as the file system spells it. Default: `[]`. With no file named, the rule reports nothing.

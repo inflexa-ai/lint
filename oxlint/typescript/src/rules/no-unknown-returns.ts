@@ -1,5 +1,4 @@
-import type { TSESLint, TSESTree } from '@typescript-eslint/utils'
-import { AST_NODE_TYPES } from '@typescript-eslint/utils'
+import type { ESTree, Rule } from '@oxlint/plugins'
 import { bareReferenceName, collectTypeAliases, enclosingTypeParameterNames, FUNCTIONS, type FunctionLike } from '../helpers/type-annotations.ts'
 
 const AWAITABLES = new Set(['Promise', 'PromiseLike'])
@@ -17,7 +16,7 @@ const AWAITABLES = new Set(['Promise', 'PromiseLike'])
  * aliases of the same file are followed; a name from another file is left
  * alone, because reading one file cannot see what it means.
  */
-export const noUnknownReturns: TSESLint.RuleModule<'unknownReturn'> = {
+export const noUnknownReturns: Rule = {
   meta: {
     type: 'problem',
     docs: {
@@ -31,13 +30,13 @@ export const noUnknownReturns: TSESLint.RuleModule<'unknownReturn'> = {
     },
   },
   create(context) {
-    let aliases = new Map<string, TSESTree.TSTypeAliasDeclaration>()
+    let aliases = new Map<string, ESTree.TSTypeAliasDeclaration>()
 
     /** Whether a written return type is `unknown` once unions, `Promise<>` and this file's aliases are followed. */
-    function resolvesToUnknown(type: TSESTree.TypeNode, shadowed: Set<string>, visited = new Set<string>()): boolean {
-      if (type.type === AST_NODE_TYPES.TSUnknownKeyword) return true
-      if (type.type === AST_NODE_TYPES.TSUnionType) return type.types.some((member) => resolvesToUnknown(member, shadowed, visited))
-      if (type.type === AST_NODE_TYPES.TSTypeReference && type.typeName.type === AST_NODE_TYPES.Identifier && AWAITABLES.has(type.typeName.name)) {
+    function resolvesToUnknown(type: ESTree.TSType, shadowed: Set<string>, visited = new Set<string>()): boolean {
+      if (type.type === 'TSUnknownKeyword') return true
+      if (type.type === 'TSUnionType') return type.types.some((member) => resolvesToUnknown(member, shadowed, visited))
+      if (type.type === 'TSTypeReference' && type.typeName.type === 'Identifier' && AWAITABLES.has(type.typeName.name)) {
         const value = type.typeArguments?.params[0]
         return value !== undefined && resolvesToUnknown(value, shadowed, visited)
       }
@@ -50,7 +49,6 @@ export const noUnknownReturns: TSESLint.RuleModule<'unknownReturn'> = {
 
     function check(node: FunctionLike): void {
       const annotation = node.returnType
-      // typescript-estree leaves an absent return type `undefined`, and oxlint gives `null`.
       if (!annotation) return
       if (!resolvesToUnknown(annotation.typeAnnotation, enclosingTypeParameterNames(node))) return
       context.report({ node: annotation.typeAnnotation, messageId: 'unknownReturn' })

@@ -1,6 +1,5 @@
-import { TSESLint, type TSESTree } from '@typescript-eslint/utils'
-import { AST_NODE_TYPES } from '@typescript-eslint/utils'
-import { exportedName, isGlobalIdentifier, staticMemberName, variableFor } from '../helpers/static-names.ts'
+import type { ESTree, Rule } from '@oxlint/plugins'
+import { exportedName, type Identifier, isGlobalIdentifier, staticMemberName, variableFor } from '../helpers/static-names.ts'
 
 // Each framework object, the module a file imports it from instead of taking
 // it from the test globals, and its calls that replace a whole module with a
@@ -31,7 +30,7 @@ const FRAMEWORKS: Record<string, { source: string; methods: Set<string> }> = {
  * that happens to be called `vi` is left alone, and `vi['mock']` is the same
  * call as `vi.mock`.
  */
-export const noModuleMocking: TSESLint.RuleModule<'moduleMock'> = {
+export const noModuleMocking: Rule = {
   meta: {
     type: 'problem',
     docs: {
@@ -48,11 +47,9 @@ export const noModuleMocking: TSESLint.RuleModule<'moduleMock'> = {
     const { sourceCode } = context
 
     /** The import specifiers that bind an identifier, beside the module that each one names. */
-    function importsOf(node: TSESTree.Identifier): { specifier: TSESTree.Node; source: string }[] {
+    function importsOf(node: Identifier): { specifier: ESTree.Node; source: string }[] {
       return (variableFor(sourceCode, node)?.defs ?? []).flatMap((def) =>
-        def.type === TSESLint.Scope.DefinitionType.ImportBinding && def.parent.type === AST_NODE_TYPES.ImportDeclaration
-          ? [{ specifier: def.node, source: def.parent.source.value }]
-          : [],
+        def.type === 'ImportBinding' && def.parent?.type === 'ImportDeclaration' ? [{ specifier: def.node, source: def.parent.source.value }] : [],
       )
     }
 
@@ -61,28 +58,28 @@ export const noModuleMocking: TSESLint.RuleModule<'moduleMock'> = {
      * message: a global, a named import under any local name, or a member of a
      * namespace import of the framework module.
      */
-    function frameworkOf(node: TSESTree.Expression): { name: string; path: string } | undefined {
-      if (node.type === AST_NODE_TYPES.Identifier) {
+    function frameworkOf(node: ESTree.Expression): { name: string; path: string } | undefined {
+      if (node.type === 'Identifier') {
         if (isGlobalIdentifier(sourceCode, node)) return Object.hasOwn(FRAMEWORKS, node.name) ? { name: node.name, path: node.name } : undefined
         for (const { specifier, source } of importsOf(node)) {
-          if (specifier.type !== AST_NODE_TYPES.ImportSpecifier) continue
+          if (specifier.type !== 'ImportSpecifier') continue
           const name = exportedName(specifier.imported)
           if (Object.hasOwn(FRAMEWORKS, name) && source === FRAMEWORKS[name].source) return { name, path: node.name }
         }
         return undefined
       }
-      if (node.type !== AST_NODE_TYPES.MemberExpression || node.object.type !== AST_NODE_TYPES.Identifier) return undefined
+      if (node.type !== 'MemberExpression' || node.object.type !== 'Identifier') return undefined
       const name = staticMemberName(node)
       if (name === undefined || !Object.hasOwn(FRAMEWORKS, name)) return undefined
       const namespace = node.object
-      const imported = importsOf(namespace).some(({ specifier, source }) => specifier.type === AST_NODE_TYPES.ImportNamespaceSpecifier && source === FRAMEWORKS[name].source)
+      const imported = importsOf(namespace).some(({ specifier, source }) => specifier.type === 'ImportNamespaceSpecifier' && source === FRAMEWORKS[name].source)
       return imported ? { name, path: `${namespace.name}.${name}` } : undefined
     }
 
     return {
       CallExpression(node) {
         const { callee } = node
-        if (callee.type !== AST_NODE_TYPES.MemberExpression) return
+        if (callee.type !== 'MemberExpression') return
         const framework = frameworkOf(callee.object)
         if (framework === undefined) return
         const method = staticMemberName(callee)

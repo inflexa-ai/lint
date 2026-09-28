@@ -1,7 +1,8 @@
-import type { TSESLint } from '@typescript-eslint/utils'
+import type { Rule } from '@oxlint/plugins'
 import { moduleSourceVisitors } from '@inflexa-ai/oxlint-plugin/helpers/module-sources'
+import { objectsOption, optionalStringOption, optionObject } from '@inflexa-ai/oxlint-plugin/helpers/rule-options'
 
-/** The options of the rule, once ESLint has merged `meta.defaultOptions` into them. */
+/** The options of the rule, once oxlint has merged `meta.defaultOptions` into them. */
 type Options = { also: { pattern: string; reason: string }[] }
 
 const DEFAULTS: Options = { also: [] }
@@ -24,7 +25,7 @@ const SHARED_PACKAGE_CONCERNS = [
  * any one of them. `also` adds zone-specific entries (the app workspaces
  * themselves, or a library one package may use and another may not).
  */
-export const noAppConcerns: TSESLint.RuleModule<'concern', [Partial<Options>]> = {
+export const noAppConcerns: Rule = {
   meta: {
     type: 'problem',
     docs: {
@@ -54,7 +55,11 @@ export const noAppConcerns: TSESLint.RuleModule<'concern', [Partial<Options>]> =
     },
   },
   create(context) {
-    const { also } = { ...DEFAULTS, ...context.options[0] }
+    const also = objectsOption(optionObject(context.options), 'also').flatMap((entry) => {
+      const pattern = optionalStringOption(entry, 'pattern')
+      const reason = optionalStringOption(entry, 'reason')
+      return pattern === undefined || reason === undefined ? [] : [{ pattern, reason }]
+    })
     const concerns = [...SHARED_PACKAGE_CONCERNS, ...also].map(({ pattern, reason }) => ({
       pattern: new RegExp(pattern),
       reason,

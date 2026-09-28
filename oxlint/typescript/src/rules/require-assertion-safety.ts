@@ -1,5 +1,4 @@
-import type { TSESLint, TSESTree } from '@typescript-eslint/utils'
-import { AST_NODE_TYPES } from '@typescript-eslint/utils'
+import type { ESTree, Rule } from '@oxlint/plugins'
 // A statement is where the reason for an assertion reads: a person writes the
 // invariant above the line, not squeezed inside the expression. The walk up
 // from an assertion stops at the nearest of these, and a `SAFETY:` comment
@@ -9,10 +8,8 @@ const STATEMENTS = new Set(['ExpressionStatement', 'PropertyDefinition', 'Return
 const SAFETY = /\bSAFETY\s*:/
 
 /** Whether a node asserts to `const`, which widens nothing and states no invariant. */
-function isConstAssertion(node: TSESTree.TSAsExpression | TSESTree.TSTypeAssertion): boolean {
-  return (
-    node.typeAnnotation.type === AST_NODE_TYPES.TSTypeReference && node.typeAnnotation.typeName.type === AST_NODE_TYPES.Identifier && node.typeAnnotation.typeName.name === 'const'
-  )
+function isConstAssertion(node: ESTree.TSAsExpression | ESTree.TSTypeAssertion): boolean {
+  return node.typeAnnotation.type === 'TSTypeReference' && node.typeAnnotation.typeName.type === 'Identifier' && node.typeAnnotation.typeName.name === 'const'
 }
 
 /**
@@ -33,7 +30,7 @@ function isConstAssertion(node: TSESTree.TSAsExpression | TSESTree.TSTypeAsserti
  * carries no claim to justify. The comment is asked for once per statement,
  * where a person reads it, rather than crowded against the operator.
  */
-export const requireAssertionSafety: TSESLint.RuleModule<'missingSafety'> = {
+export const requireAssertionSafety: Rule = {
   meta: {
     type: 'problem',
     docs: {
@@ -50,15 +47,15 @@ export const requireAssertionSafety: TSESLint.RuleModule<'missingSafety'> = {
     const { sourceCode } = context
 
     /** Whether a `SAFETY:` comment sits before the assertion, up to the statement that owns it. */
-    function hasSafety(node: TSESTree.Node): boolean {
-      for (let current: TSESTree.Node | undefined = node; current !== undefined; current = current.parent) {
+    function hasSafety(node: ESTree.Node): boolean {
+      for (let current: ESTree.Node | null = node; current !== null; current = current.parent) {
         if (sourceCode.getCommentsBefore(current).some((comment) => comment.range[1] <= node.range[0] && SAFETY.test(comment.value))) return true
-        if (STATEMENTS.has(current.type) || current.parent?.type === AST_NODE_TYPES.Program) return false
+        if (STATEMENTS.has(current.type) || current.parent?.type === 'Program') return false
       }
       return false
     }
 
-    function check(node: TSESTree.TSAsExpression | TSESTree.TSTypeAssertion): void {
+    function check(node: ESTree.TSAsExpression | ESTree.TSTypeAssertion): void {
       if (isConstAssertion(node) || hasSafety(node)) return
       context.report({ node, messageId: 'missingSafety' })
     }

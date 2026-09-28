@@ -1,5 +1,5 @@
-import type { InvalidTestCase } from '@typescript-eslint/rule-tester'
 import globals from 'globals'
+import type { RuleTester } from 'oxlint/plugins-dev'
 import { noRawNetwork } from '../no-raw-network.ts'
 import { createRuleTester } from './rule-tester.ts'
 
@@ -25,7 +25,7 @@ const valid = [
   `const prefetch = 1; const WebSocketLike = 2`,
 ]
 
-const invalid: InvalidTestCase<'rawNetwork', [{ globals?: string[]; navigatorMethods?: string[]; hint?: string }]>[] = [
+const invalid: RuleTester.InvalidTestCase[] = [
   { code: `fetch('/api/projects')`, errors: [raw('fetch')] },
   { code: `const load = () => fetch('/x'); load()`, errors: [raw('fetch')] },
   // Handing the global to something else is still reaching for it.

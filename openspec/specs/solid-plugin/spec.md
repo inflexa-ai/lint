@@ -13,7 +13,7 @@ The package `@inflexa-ai/oxlint-plugin-solid` gives a SolidJS repository of Infl
 #### Scenario: The manifest of the Solid package
 
 - **WHEN** a reader opens `oxlint/solid/package.json`
-- **THEN** its version equals the version of `oxlint/typescript/package.json`, which is `0.4.0`, its `dependencies` hold `@inflexa-ai/oxlint-plugin` at `^0.4.0` and `eslint-plugin-solid`, and no entry of `dependencies` or `peerDependencies` names `react`, `@tanstack/`, `testing-library` or `playwright`
+- **THEN** its version equals the version of `oxlint/typescript/package.json`, which is `0.5.0`, its `dependencies` hold `@inflexa-ai/oxlint-plugin` at `^0.5.0` and `eslint-plugin-solid`, and no entry of `dependencies` or `peerDependencies` names `react`, `@tanstack/`, `testing-library` or `playwright`
 
 ### Requirement: solid() adds the Solid rules to the configuration of typescript()
 

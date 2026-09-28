@@ -5,10 +5,10 @@ The oxlint rules and the shared oxlint configuration for SolidJS applications. T
 ## Install
 
 ```sh
-npm install --save-dev @inflexa-ai/oxlint-plugin-solid @inflexa-ai/oxlint-plugin oxlint oxlint-tsgolint eslint typescript
+npm install --save-dev @inflexa-ai/oxlint-plugin-solid @inflexa-ai/oxlint-plugin oxlint oxlint-tsgolint
 ```
 
-Install `@inflexa-ai/oxlint-plugin` beside this package. The repository imports `vitest` and `@inflexa-ai/oxlint-plugin/eslint` from it, and it runs its `directive-guard`.
+Install `@inflexa-ai/oxlint-plugin` beside this package. The repository imports `vitest` from it, and it runs its `directive-guard`.
 
 Pin `oxlint` and `oxlint-tsgolint` to exact versions, because JS plugins and type-aware rules are not under semver.
 
@@ -42,18 +42,18 @@ The `version` option writes the major version of Solid to `settings.solid.versio
 
 `typescript()` bans each raw timer, and `solid()` keeps the ban. To let a component use `setInterval` with an `onCleanup`, set `syntax: { timers: false }`. A repository can also turn the ban off in its own blocks.
 
-oxlint gives a JS plugin no type information. Thus ESLint runs the rules that read types, through the `eslint.config.js` of the TypeScript package:
+oxlint gives a JS plugin no type information. Thus `inflexa-typecheck` of `@inflexa-ai/typecheck` runs the rules that read types, together with the type check of `tsc --noEmit`. Install `@inflexa-ai/typecheck` and `typescript` 7.0.2, and write `typecheck.config.ts`:
 
-```js
-import { typescript } from '@inflexa-ai/oxlint-plugin/eslint'
+```ts
+import { typecheck } from '@inflexa-ai/typecheck'
 
-export default [...typescript({ tsconfigRootDir: import.meta.dirname })]
+export default typecheck()
 ```
 
 Run the three tools in this sequence:
 
 ```sh
-oxlint && eslint . && directive-guard
+oxlint && inflexa-typecheck && directive-guard
 ```
 
 `directive-guard` comes with `@inflexa-ai/oxlint-plugin`. It reports each disable directive that switches off a rule of `@inflexa-ai/` with no entry in the lint configuration.

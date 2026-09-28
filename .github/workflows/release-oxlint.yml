@@ -15,6 +15,7 @@ on:
   push:
     branches: [main]
     paths:
+      - oxlint/typecheck/package.json
       - oxlint/typescript/package.json
       - oxlint/react/package.json
       - oxlint/solid/package.json

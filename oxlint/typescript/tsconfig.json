@@ -2,7 +2,5 @@
   // The type check of the sources and of the tests.
   "extends": "../tsconfig.base.json",
   "compilerOptions": { "noEmit": true },
-  "include": ["src", "vitest.config.ts"],
-  // A fixture is the input of a typed rule test. Its own tsconfig types it.
-  "exclude": ["src/**/test/fixtures"]
+  "include": ["src", "vitest.config.ts"]
 }

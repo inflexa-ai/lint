@@ -17,7 +17,7 @@ The oxlint factories of the packages of the workspace give each repository of In
 
 #### Scenario: A Solid repository loads the configuration from the published packages
 
-- **WHEN** a repository installs `@inflexa-ai/oxlint-plugin-solid`, `@inflexa-ai/oxlint-plugin`, `oxlint`, `oxlint-tsgolint`, `eslint` and `typescript`, and its `oxlint.config.ts` default-exports `solid()`
+- **WHEN** a repository installs `@inflexa-ai/oxlint-plugin-solid`, `@inflexa-ai/oxlint-plugin`, `oxlint` and `oxlint-tsgolint`, and its `oxlint.config.ts` default-exports `solid()`
 - **THEN** oxlint loads the plugin of the TypeScript package, the plugin of the Solid package and `eslint-plugin-solid` from the installed packages
 
 ### Requirement: The rule set names each rule
@@ -31,12 +31,12 @@ The factory SHALL turn off the `correctness` category and name each rule. The ru
 
 ### Requirement: Each tool reads its own directive form
 
-The configuration SHALL set `respectEslintDisableDirectives: false` and `reportUnusedDisableDirectives: 'error'`. oxlint then reads `oxlint-disable` directives only, and ESLint reads `eslint-disable` directives only.
+The configuration SHALL set `respectEslintDisableDirectives: false` and `reportUnusedDisableDirectives: 'error'`. oxlint then reads `oxlint-disable` directives only, `inflexa-typecheck` reads `typecheck-disable-next-line` directives only, and no tool reads an `eslint-disable` directive.
 
 #### Scenario: An ESLint directive does not silence an oxlint rule
 
 - **WHEN** a file carries `// eslint-disable-next-line @inflexa-ai/no-interface` above an `interface`
-- **THEN** oxlint reports `no-interface` for that interface, and ESLint reports the directive as unused
+- **THEN** oxlint reports `no-interface` for that interface, and `directive-guard` reports the directive
 
 ### Requirement: The syntax bans run as eslint-js/no-restricted-syntax
 

@@ -1,7 +1,8 @@
-import type { TSESLint } from '@typescript-eslint/utils'
+import type { Rule } from '@oxlint/plugins'
 import { moduleSourceVisitors } from '@inflexa-ai/oxlint-plugin/helpers/module-sources'
+import { optionalStringOption, optionObject, stringOption, stringsOption } from '@inflexa-ai/oxlint-plugin/helpers/rule-options'
 
-/** The options of the rule, once ESLint has merged `meta.defaultOptions` into them. */
+/** The options of the rule, once oxlint has merged `meta.defaultOptions` into them. */
 type Options = { storeFilePattern: string; factorySource?: string; bannedInStores: string[] }
 
 // No default: the module that exports the factory belongs to each repository,
@@ -16,7 +17,7 @@ const DEFAULTS: Options = {
  * state. Stores live in files named for what they are, and those files cannot
  * reach the things that would let server data leak into them.
  */
-export const storePlacement: TSESLint.RuleModule<'factoryOutsideStore' | 'serverDataInStore', [Partial<Options>]> = {
+export const storePlacement: Rule = {
   meta: {
     type: 'problem',
     docs: {
@@ -43,7 +44,10 @@ export const storePlacement: TSESLint.RuleModule<'factoryOutsideStore' | 'server
     },
   },
   create(context) {
-    const { storeFilePattern, factorySource, bannedInStores } = { ...DEFAULTS, ...context.options[0] }
+    const options = optionObject(context.options)
+    const storeFilePattern = stringOption(options, 'storeFilePattern', DEFAULTS.storeFilePattern)
+    const factorySource = optionalStringOption(options, 'factorySource')
+    const bannedInStores = stringsOption(options, 'bannedInStores', DEFAULTS.bannedInStores)
     const isStoreFile = new RegExp(storeFilePattern).test(context.filename)
     const banned = bannedInStores.map((pattern) => new RegExp(pattern))
 

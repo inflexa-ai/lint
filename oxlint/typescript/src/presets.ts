@@ -62,7 +62,7 @@ export const eslintRecommended: Rules = {
 /**
  * The strict type-checked preset of typescript-eslint. tsgolint runs its typed
  * rules. `no-generated-empty-object-type` is absent: oxlint does not have it
- * yet, thus the ESLint configuration of `./eslint.ts` runs it.
+ * yet, thus `typecheck()` of `@inflexa-ai/typecheck` turns on its port.
  */
 export const typescriptStrict: Rules = {
   'typescript/await-thenable': 'error',

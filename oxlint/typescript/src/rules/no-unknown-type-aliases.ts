@@ -1,5 +1,4 @@
-import type { TSESLint, TSESTree } from '@typescript-eslint/utils'
-import { AST_NODE_TYPES } from '@typescript-eslint/utils'
+import type { ESTree, Rule } from '@oxlint/plugins'
 import { bareReferenceName, collectTypeAliases } from '../helpers/type-annotations.ts'
 
 /**
@@ -14,7 +13,7 @@ import { bareReferenceName, collectTypeAliases } from '../helpers/type-annotatio
  * name cannot launder the top type through a second hop. A name from another
  * file is not followed, because reading one file cannot see what it means.
  */
-export const noUnknownTypeAliases: TSESLint.RuleModule<'unknownAlias'> = {
+export const noUnknownTypeAliases: Rule = {
   meta: {
     type: 'problem',
     docs: {
@@ -33,9 +32,9 @@ export const noUnknownTypeAliases: TSESLint.RuleModule<'unknownAlias'> = {
         const aliases = collectTypeAliases(node)
 
         /** Whether an alias body is `unknown` once unions and this file's aliases are followed. */
-        function resolvesToUnknown(type: TSESTree.TypeNode, visited: Set<string>): boolean {
-          if (type.type === AST_NODE_TYPES.TSUnknownKeyword) return true
-          if (type.type === AST_NODE_TYPES.TSUnionType) return type.types.some((member) => resolvesToUnknown(member, visited))
+        function resolvesToUnknown(type: ESTree.TSType, visited: Set<string>): boolean {
+          if (type.type === 'TSUnknownKeyword') return true
+          if (type.type === 'TSUnionType') return type.types.some((member) => resolvesToUnknown(member, visited))
           const name = bareReferenceName(type)
           if (name === undefined || visited.has(name)) return false
           const alias = aliases.get(name)

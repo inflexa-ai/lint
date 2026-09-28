@@ -4,5 +4,5 @@
   // thus the check needs no build.
   "extends": "./tsconfig.base.json",
   "compilerOptions": { "noEmit": true },
-  "include": ["oxlint.config.ts"]
+  "include": ["oxlint.config.ts", "typecheck.config.ts"]
 }

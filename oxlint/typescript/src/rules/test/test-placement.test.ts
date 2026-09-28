@@ -3,10 +3,10 @@ import { createRuleTester } from './rule-tester.ts'
 
 const ruleTester = createRuleTester()
 
-// ESLint hands a rule an absolute path under its working directory. The tester
-// of typescript-eslint moves the working directory to the root of the file
-// system for an absolute path, thus the cases name a path relative to the
-// working directory, which the rule resolves the same way.
+// oxlint hands a rule an absolute path under its working directory. The
+// RuleTester of oxlint makes the folder of an absolute file name the working
+// directory, thus the cases name a path relative to the working directory,
+// which the tester joins to its own and the rule resolves the same way.
 
 const code = `export const nothing = 1`
 

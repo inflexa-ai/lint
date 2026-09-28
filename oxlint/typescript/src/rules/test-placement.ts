@@ -1,7 +1,8 @@
-import type { TSESLint } from '@typescript-eslint/utils'
+import type { Rule } from '@oxlint/plugins'
 import path from 'node:path'
+import { optionObject, stringOption } from '../helpers/rule-options.ts'
 
-/** The options of the rule, once ESLint has merged `meta.defaultOptions` into them. */
+/** The options of the rule, once oxlint has merged `meta.defaultOptions` into them. */
 type Options = { testFilePattern: string; testFolder: string }
 
 const DEFAULTS: Options = { testFilePattern: '\\.test\\.[jt]sx?$', testFolder: 'test' }
@@ -17,7 +18,7 @@ const DEFAULTS: Options = { testFilePattern: '\\.test\\.[jt]sx?$', testFolder: '
  * guessed the subject from the filename would fight every test that covers a
  * folder, a build step or the test setup rather than one module.
  */
-export const testPlacement: TSESLint.RuleModule<'outsideTestFolder', [Partial<Options>]> = {
+export const testPlacement: Rule = {
   meta: {
     type: 'problem',
     docs: {
@@ -41,7 +42,9 @@ export const testPlacement: TSESLint.RuleModule<'outsideTestFolder', [Partial<Op
     },
   },
   create(context) {
-    const { testFilePattern, testFolder } = { ...DEFAULTS, ...context.options[0] }
+    const options = optionObject(context.options)
+    const testFilePattern = stringOption(options, 'testFilePattern', DEFAULTS.testFilePattern)
+    const testFolder = stringOption(options, 'testFolder', DEFAULTS.testFolder)
     const { filename } = context
 
     if (!new RegExp(testFilePattern).test(filename)) return {}
