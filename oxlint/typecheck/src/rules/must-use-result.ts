@@ -2,6 +2,7 @@ import {
   isArrayLiteralExpression,
   isArrowFunction,
   isAwaitExpression,
+  isBinaryExpression,
   isCallExpression,
   isFunctionExpression,
   isIdentifier,
@@ -218,24 +219,38 @@ export const mustUseResult: RuleModule<Options> = {
       return call !== undefined && isCallExpression(call) && call.arguments.some((argument) => unwrap(argument) === array) && isResultLike(call)
     }
 
-    /** Upstream `getAssignation`: the name of the nearest variable up to a block whose initializer is a Result. */
+    /**
+     * Upstream `getAssignation`: the name of the nearest variable up to a block
+     * whose initializer is a Result. It also takes the variable of an assignment
+     * `name = <Result>` that the walk reaches from the right side.
+     */
     function assignedName(node: Node): Node | undefined {
-      for (let current = node; !END_OF_WALK.has(current.kind); current = current.parent) {
+      for (let child: Node | undefined, current: Node = node; !END_OF_WALK.has(current.kind); child = current, current = current.parent) {
         if (isVariableDeclaration(current) && isResultLike(current.initializer) && isIdentifier(current.name)) return current.name
+        if (isBinaryExpression(current) && current.operatorToken.kind === SyntaxKind.EqualsToken && child === current.right && isResultLike(current.right)) {
+          const target = unwrap(current.left)
+          if (isIdentifier(target)) return target
+        }
       }
       return undefined
     }
 
-    /** Upstream `handleAssignation`: whether a reference of the variable that holds the value uses it. */
-    function isUsedThroughVariable(node: Node): boolean {
+    /**
+     * Upstream `handleAssignation`: whether a reference of the variable that
+     * holds the value uses it. `followed` holds the variables on the path of the
+     * walk: `r = r.map(f)` leads from a reference of `r` back to `r`, and
+     * without the set the walk never ends.
+     */
+    function isUsedThroughVariable(node: Node, followed: ReadonlySet<number>): boolean {
       const name = assignedName(node)
       if (name === undefined) return false
       const symbol = checker.getSymbolAtLocation(name)
-      if (symbol === undefined) return false
+      if (symbol === undefined || followed.has(symbol.id)) return false
+      const path = new Set(followed).add(symbol.id)
       return checker.getReferencesToSymbolInFile(sourceFile.fileName, symbol).some((handle) => {
         const reference = handle.resolve()
         if (reference === undefined || (reference.pos === name.pos && reference.end === name.end)) return false
-        return !isUnused(reference, true)
+        return !isUnused(reference, true, path)
       })
     }
 
@@ -244,20 +259,20 @@ export const mustUseResult: RuleModule<Options> = {
      * uses. It reports the value at the expression that gives it, also when a
      * variable holds it, and a reference of a variable reports nothing itself.
      */
-    function isUnused(node: Node, isReference: boolean): boolean {
+    function isUnused(node: Node, isReference: boolean, followed: ReadonlySet<number>): boolean {
       const parent = parentOf(node)
       if (parent !== undefined && IGNORED_PARENTS.has(parent.kind)) return false
       if (!isResultLike(node)) return false
       // The `await` above a call reports it, thus the call does not report twice.
       if (isCallExpression(node) && parent !== undefined && isAwaitExpression(parent)) return false
       if (isHandledResult(node) || isInsideSafeTryYield(node) || isCheckedResult(node) || isReturned(node) || isInResultCall(node) || isConsumed(node, consumers)) return false
-      if (isUsedThroughVariable(node)) return false
+      if (isUsedThroughVariable(node, followed)) return false
       if (!isReference) context.report({ node, messageId: 'mustUseResult' })
       return true
     }
 
     const visit = (node: Node): void => {
-      isUnused(node, false)
+      isUnused(node, false, new Set())
     }
     return { [SyntaxKind.CallExpression]: visit, [SyntaxKind.NewExpression]: visit, [SyntaxKind.AwaitExpression]: visit }
   },

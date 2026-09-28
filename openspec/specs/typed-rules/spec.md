@@ -31,6 +31,7 @@ The rules that read types run in `inflexa-typecheck` on the program of TypeScrip
 - An element of an array that goes directly into a call that gives a `Result`, for example `Result.combine([a, b])`.
 - An argument of a call whose callee is an identifier that the option `consumers` names, directly or through a chain of `orElse`, `map`, `mapErr` or `andThen` calls.
 - The nearest variable declaration among its ancestors up to the nearest block has an identifier name and an initializer that is a `Result`, and a reference of that variable uses the value by one of the rules above, as `getAssignation` and `handleAssignation` of upstream decide.
+- The nearest assignment `name = <Result>` among its ancestors up to the nearest block, which the walk reaches from its right side, has an identifier on the left, and a reference of that variable uses the value by one of the rules above. Upstream follows only a declaration. The walk SHALL follow each variable once on its path, thus `r = r.map(f)` ends.
 
 The rule SHALL step through parentheses, `await`, `as`, `!` and `?.` between the value and its use. As upstream does, it SHALL leave out an expression whose parent is a type assertion (`as`, `satisfies`, `<T>`) or a non-null assertion, and an initializer of a class field. The rule SHALL report an unused value at the expression that gives it, also when a variable holds the value. The option `consumers` SHALL default to an empty list.
 
@@ -63,6 +64,16 @@ The rule SHALL step through parentheses, `await`, `as`, `!` and `?.` between the
 
 - **WHEN** a function holds `return getResult().map(() => {})` or `return cond ? ok(1) : err('e')`, or an arrow function has `getResult()` as its body
 - **THEN** the rule reports nothing
+
+#### Scenario: An assignment to a variable declared earlier
+
+- **WHEN** a function holds `let r: Result<number, Error>`, then `r = await loadLater()` in a `try` block whose `catch` returns, then `if (r.isErr()) return`
+- **THEN** the rule reports nothing, and it reports `load()` in `let r: Result<number, Error>; r = load()` when no reference of `r` uses the value
+
+#### Scenario: An assignment that reads its own variable
+
+- **WHEN** a file holds `let r = load(); r = r.map(f); r.unwrapOr(0)`
+- **THEN** the rule reports nothing, and the walk ends
 
 #### Scenario: A conditional initializer
 
