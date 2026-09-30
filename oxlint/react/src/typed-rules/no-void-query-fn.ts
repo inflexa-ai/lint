@@ -1,6 +1,14 @@
 import type { RuleModule } from '@inflexa-ai/typecheck'
-import { isIdentifier, isMethodDeclaration, isObjectLiteralExpression, isPropertyAssignment, isShorthandPropertyAssignment, type Node, SyntaxKind } from 'typescript/unstable/ast'
-import { isUnionType, SignatureKind, type Type, TypeFlags } from 'typescript/unstable/sync'
+import {
+  isIdentifier,
+  isMethodDeclaration,
+  isObjectLiteralExpression,
+  isPropertyAssignment,
+  isShorthandPropertyAssignment,
+  type Node,
+  SyntaxKind,
+} from '@inflexa-ai/typecheck/unstable/ast'
+import { isUnionType, SignatureKind, type Type, TypeFlags } from '@inflexa-ai/typecheck/unstable/sync'
 
 /** How many `then` steps the promised type of a thenable takes before the rule gives up on it, as a guard against a type that promises itself. */
 const MAX_AWAIT_DEPTH = 10

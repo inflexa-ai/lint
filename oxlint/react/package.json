@@ -51,8 +51,7 @@
     "eslint-plugin-better-tailwindcss": "^4.7.0",
     "eslint-plugin-react-doctor": "^0.9.14",
     "oxlint": "^1.85.0",
-    "oxlint-tsgolint": ">=7.0.2003",
-    "typescript": "7.0.2"
+    "oxlint-tsgolint": ">=7.0.2003"
   },
   "peerDependenciesMeta": {
     "@inflexa-ai/typecheck": {
@@ -62,9 +61,6 @@
       "optional": true
     },
     "eslint-plugin-react-doctor": {
-      "optional": true
-    },
-    "typescript": {
       "optional": true
     }
   },

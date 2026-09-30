@@ -1,4 +1,4 @@
-import { isCallExpression, SyntaxKind } from 'typescript/unstable/ast'
+import { isCallExpression, SyntaxKind } from '@typescript/native/unstable/ast'
 import type { Plugin, RuleModule } from '../rule.ts'
 
 /** The nodes that the rules of the plugin visited, in the order of the visits, for the test of the walk. */

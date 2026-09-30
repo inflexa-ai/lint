@@ -65,9 +65,11 @@ export default react({
 })
 ```
 
-For the typed rules, the repository installs `@inflexa-ai/typecheck` and
-`typescript` 7.0.2. It calls `typecheck()` in its own `typecheck.config.ts`, and
-turns on each typed rule for the files that it guards:
+For the typed rules, the repository installs `@inflexa-ai/typecheck` and holds the two TypeScript aliases in its
+`devDependencies`: `@typescript/native` at `npm:typescript@7.0.2` for `tsc` and `inflexa-typecheck`, and `typescript`
+at `npm:@typescript/typescript6@^6.0.2` for the editors, which read TypeScript 6. The editors check with TypeScript 6,
+while `tsc` and `inflexa-typecheck` check with TypeScript 7. The repository calls `typecheck()` in its own
+`typecheck.config.ts`, and turns on each typed rule for the files that it guards:
 
 ```ts
 import { plugin as react } from '@inflexa-ai/oxlint-plugin-react/typecheck'
@@ -118,9 +120,12 @@ the blocks of the repository. A glob in a package cannot know the layout of each
 repository.
 
 Each tool reads its own form of directive. oxlint reads `oxlint-disable`
-comments, and `inflexa-typecheck` reads `typecheck-disable-next-line` comments.
-No tool reads `eslint-disable`, and `directive-guard` reports each one. Each
-tool reports the unused directives of its own form.
+comments, and `inflexa-typecheck` reads `typecheck-disable-next-line` comments
+only. No tool reads `eslint-disable`, and no tool reads the other typecheck
+forms, `typecheck-disable` and `typecheck-disable-line`. `directive-guard`
+reports each directive of the forms that no tool reads, and each directive of
+the live forms that switches off a guarded rule. Each tool reports the unused
+directives of its own form.
 
 A message states the principle. When a rule points at a replacement, the
 repository names its own module in the `hint` option of that rule.

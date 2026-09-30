@@ -31,6 +31,16 @@
       "types": "./dist/helpers/*.d.ts",
       "default": "./dist/helpers/*.js"
     },
+    "./unstable/ast": {
+      "source": "./src/unstable/ast.ts",
+      "types": "./dist/unstable/ast.d.ts",
+      "default": "./dist/unstable/ast.js"
+    },
+    "./unstable/sync": {
+      "source": "./src/unstable/sync.ts",
+      "types": "./dist/unstable/sync.d.ts",
+      "default": "./dist/unstable/sync.js"
+    },
     "./package.json": "./package.json"
   },
   "bin": {
@@ -49,7 +59,7 @@
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run"
   },
-  "peerDependencies": {
-    "typescript": "7.0.2"
+  "dependencies": {
+    "@typescript/native": "npm:typescript@7.0.2"
   }
 }

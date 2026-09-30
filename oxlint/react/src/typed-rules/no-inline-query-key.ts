@@ -15,8 +15,8 @@ import {
   isTypeAssertion,
   type Node,
   SyntaxKind,
-} from 'typescript/unstable/ast'
-import { type Signature, SignatureKind, type Symbol as TypeSymbol } from 'typescript/unstable/sync'
+} from '@inflexa-ai/typecheck/unstable/ast'
+import { type Signature, SignatureKind, type Symbol as TypeSymbol } from '@inflexa-ai/typecheck/unstable/sync'
 
 /**
  * The package that declares the cache and the client over it, whatever

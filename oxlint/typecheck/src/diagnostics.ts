@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { type Diagnostic, DiagnosticCategory, type Program } from 'typescript/unstable/sync'
+import { type Diagnostic, DiagnosticCategory, type Program } from '@typescript/native/unstable/sync'
 import type { ProjectFiles } from './projects.ts'
 
 /**

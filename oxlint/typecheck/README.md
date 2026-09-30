@@ -5,10 +5,23 @@ The command `inflexa-typecheck`. It does the type check of `tsc --noEmit` on Typ
 ## Install
 
 ```sh
-npm install --save-dev @inflexa-ai/typecheck typescript@7.0.2
+npm install --save-dev @inflexa-ai/typecheck
 ```
 
-The package reads the program through `typescript/unstable/sync`, which is not under semver. Thus the peer dependency is the exact version of TypeScript that the CI of this package uses. Install that version.
+Hold the two TypeScript aliases in the `devDependencies` of the repository:
+
+```json
+{
+  "devDependencies": {
+    "@typescript/native": "npm:typescript@7.0.2",
+    "typescript": "npm:@typescript/typescript6@^6.0.2"
+  }
+}
+```
+
+The package reads the program through the unstable sync API of TypeScript 7, which is not under semver. Thus it depends on the exact release `npm:typescript@7.0.2` under the alias name `@typescript/native`, and it declares no `typescript` peer. Keep `@typescript/native` in your `devDependencies` at the same exact version, so npm dedupes the two into one TypeScript 7, and raise the two together when a new release comes.
+
+The name `typescript` holds TypeScript 6, which the editor reads. `tsc` and `inflexa-typecheck` check with TypeScript 7 through `@typescript/native`.
 
 ## Run
 
@@ -101,7 +114,7 @@ getResult()
 A repository gives its own rules as a plugin:
 
 ```ts
-import { isCallExpression, SyntaxKind } from 'typescript/unstable/ast'
+import { isCallExpression, SyntaxKind } from '@inflexa-ai/typecheck/unstable/ast'
 import type { Plugin, RuleModule } from '@inflexa-ai/typecheck'
 
 const noRawDate: RuleModule<{ allowIn: string[] }> = {

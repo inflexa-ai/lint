@@ -10,11 +10,24 @@ npm install --save-dev @inflexa-ai/oxlint-plugin-react oxlint oxlint-tsgolint
 
 Pin `oxlint` and `oxlint-tsgolint` to exact versions, because JS plugins and type-aware rules are not under semver.
 
-The plugins of React Doctor and Tailwind, `@inflexa-ai/typecheck` and `typescript` are optional peers:
+The plugins of React Doctor and Tailwind, and `@inflexa-ai/typecheck` are optional peers:
 
 - For the `reactDoctor` option, install `eslint-plugin-react-doctor`.
 - For the `tailwind` option, install `eslint-plugin-better-tailwindcss`.
-- For the typed rules of the `./typecheck` entry, install `@inflexa-ai/typecheck` and `typescript` 7.0.2.
+- For the typed rules of the `./typecheck` entry, install `@inflexa-ai/typecheck`.
+
+Hold the two TypeScript aliases in the `devDependencies` of the repository:
+
+```json
+{
+  "devDependencies": {
+    "@typescript/native": "npm:typescript@7.0.2",
+    "typescript": "npm:@typescript/typescript6@^6.0.2"
+  }
+}
+```
+
+`@tanstack/eslint-plugin-query`, and `eslint-plugin-solid` in the Solid package, sit on `@typescript-eslint/utils` 8.71.0. Its peer range for `typescript` is `>=4.8.4 <6.1.0`, so on TypeScript 7 the peer finds no match and `npm ls --all` exits 1. typescript-eslint widens the range when TypeScript 7 ships the API that it waits for; the request is typescript-eslint/typescript-eslint#10940. The two lines above hold TypeScript 7 beside it: `@typescript/native` serves `tsc` and `inflexa-typecheck`, the name `typescript` holds TypeScript 6 for the editors and for the peer of `@typescript-eslint/utils`, and `npm ls --all` exits 0. A repository that installs `typescript` 7 flat keeps the invalid peer; the two lines are the repair.
 
 ## Use
 

@@ -1,12 +1,14 @@
 import { spawnSync } from 'node:child_process'
+import nativeManifest from '@typescript/native/package.json' with { type: 'json' }
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { runTypecheck } from '../run.ts'
 import { writeProjects } from './projects.ts'
 
-// The `tsc` of the installed package, which the command reads through its API.
-const tsc = path.join(path.dirname(createRequire(import.meta.url).resolve('typescript/package.json')), 'bin', 'tsc')
+// In the side-by-side layout `typescript` is TypeScript 6, so the command and its compiler come from the `@typescript/native` alias.
+const nativeDir = path.dirname(createRequire(import.meta.url).resolve('@typescript/native/package.json'))
+const tsc = path.join(nativeDir, 'bin', 'tsc')
 
 const COMPILER_OPTIONS = { strict: true, target: 'es2023', module: 'nodenext', types: [] }
 
@@ -98,6 +100,10 @@ function runTsc(cwd: string, project: string): { output: string; exitCode: numbe
 }
 
 describe('the diagnostics of tsc --noEmit', () => {
+  it('compares the output with TypeScript 7, the compiler that the `@typescript/native` dependency holds', () => {
+    expect(nativeManifest.version).toBe('7.0.2')
+  })
+
   it.each(Object.keys(PROJECTS))('prints the output of tsc for the project %s', async (name) => {
     const cwd = `${root}/${name}`
     const expected = runTsc(cwd, '.')
