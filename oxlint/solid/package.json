@@ -1,6 +1,6 @@
 {
   "name": "@inflexa-ai/oxlint-plugin-solid",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "The oxlint rules and configuration of Inflexa for SolidJS applications.",
   "keywords": [
     "oxlint",
@@ -46,7 +46,7 @@
     "oxlint-tsgolint": ">=7.0.2003"
   },
   "dependencies": {
-    "@inflexa-ai/oxlint-plugin": "^0.5.0",
+    "@inflexa-ai/oxlint-plugin": "^0.6.0",
     "@oxlint/plugins": "^1.85.0",
     "eslint-plugin-solid": "^0.18.0"
   }
