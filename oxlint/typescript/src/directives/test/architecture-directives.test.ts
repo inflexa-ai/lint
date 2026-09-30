@@ -29,6 +29,36 @@ describe('findArchitectureDirectiveViolations', () => {
     expect(find(`/* oxlint-enable @inflexa-ai/no-interface */`)).toEqual([])
   })
 
+  it('reports a typecheck directive that names an architecture rule, where its comment starts', () => {
+    expect(find(`// typecheck-disable-next-line @inflexa-ai/react/no-inline-query-key -- the query key is stable here\nx`)).toEqual([
+      expect.objectContaining({ line: 1, column: 1 }),
+    ])
+    expect(find(`const a = 1\n  /* typecheck-disable-next-line @inflexa-ai/react/no-raw-state */\nx`)).toEqual([expect.objectContaining({ line: 2, column: 3 })])
+  })
+
+  it('reports a directive across the Unicode whitespace that the command trims', () => {
+    expect(find(`//\u00a0typecheck-disable-next-line @inflexa-ai/react/no-inline-query-key -- the query key is stable here\nx`)).toEqual([
+      expect.objectContaining({ line: 1, column: 1 }),
+    ])
+    expect(find(`//\u00a0oxlint-disable-next-line @inflexa-ai/react/no-raw-state\nx`)).toEqual([expect.objectContaining({ line: 1, column: 1 })])
+    const violations = find(`//\u00a0typecheck-disable @inflexa-ai/react/no-raw-state`)
+    expect(violations).toHaveLength(1)
+    expect(violations[0].message).toContain('No tool of this repository reads `typecheck-disable`')
+  })
+
+  it('stays silent for a typecheck directive that names only rules of another prefix, or no rule', () => {
+    expect(find(`// typecheck-disable-next-line @typescript-eslint/no-explicit-any -- wire type\nx`)).toEqual([])
+    expect(find(`/* typecheck-disable-next-line typescript/no-explicit-any */`)).toEqual([])
+    expect(find(`// typecheck-disable-next-line -- the reason stands alone\nx`)).toEqual([])
+    expect(find(`/* typecheck-disable-next-line */`)).toEqual([])
+  })
+
+  it('stays silent for a typecheck enable, and for words that only start like the directive', () => {
+    expect(find(`/* typecheck-enable @inflexa-ai/react/no-raw-state */`)).toEqual([])
+    expect(find(`// typecheck-disable-next @inflexa-ai/react/no-raw-state`)).toEqual([])
+    expect(find(`// typecheck-disabled @inflexa-ai/react/no-raw-state`)).toEqual([])
+  })
+
   // No tool of this repository reads the ESLint form, so each one is a leftover
   // that suppresses nothing and misleads the next reader.
   it.each([
@@ -44,8 +74,24 @@ describe('findArchitectureDirectiveViolations', () => {
   ])('reports an eslint-disable directive: %s', (_form, text) => {
     for (const violations of [find(text), findAllowing(text), findArchitectureDirectiveViolations(text, ['acme/'])]) {
       expect(violations).toHaveLength(1)
-      expect(violations[0].message).toContain('No tool of this repository reads `eslint-disable`')
+      expect(violations[0].message).toContain('No tool of this repository reads `eslint-disable')
     }
+  })
+
+  it.each([
+    ['a rule of the guarded prefix', `// typecheck-disable @inflexa-ai/react/no-raw-state\nx`],
+    ['a rule of another prefix', `// typecheck-disable @typescript-eslint/no-explicit-any\nx`],
+    ['no rule', `/* typecheck-disable */`],
+    ['a reason', `/* typecheck-disable -- trust me */`],
+    ['the same line', `x // typecheck-disable-line @inflexa-ai/react/no-raw-effect`],
+  ])('reports a typecheck form that no tool reads: %s', (_form, text) => {
+    expect(find(text)).toHaveLength(1)
+  })
+
+  it('names the form that the file carries in each report about a form that no tool reads', () => {
+    expect(find(`/* typecheck-disable */`)[0].message).toContain('No tool of this repository reads `typecheck-disable`')
+    expect(find(`// typecheck-disable-line @inflexa-ai/react/no-raw-effect`)[0].message).toContain('No tool of this repository reads `typecheck-disable-line`')
+    expect(find(`// eslint-disable-line no-console`)[0].message).toContain('No tool of this repository reads `eslint-disable-line`')
   })
 
   it('locates an eslint-disable directive where it starts', () => {
@@ -102,6 +148,22 @@ describe('a rule that may be disabled inline', () => {
   it('asks for the reason in the form of directive that the file used', () => {
     const [violation] = findAllowing(`/* oxlint-disable @inflexa-ai/test-placement */`)
     expect(violation.message).toContain('`oxlint-disable @inflexa-ai/test-placement -- <reason>`')
+  })
+
+  it('accepts a typecheck directive that names it and gives a reason', () => {
+    expect(findAllowing(`/* typecheck-disable-next-line @inflexa-ai/test-placement -- the fixture is generated beside it */`)).toEqual([])
+    expect(findAllowing(`// typecheck-disable-next-line @inflexa-ai/test-placement -- same\nx`)).toEqual([])
+  })
+
+  it('asks for the reason in the typecheck form of directive that the file used', () => {
+    const [violation] = findAllowing(`// typecheck-disable-next-line @inflexa-ai/test-placement\nx`)
+    expect(violation.message).toContain('`typecheck-disable-next-line @inflexa-ai/test-placement -- <reason>`')
+  })
+
+  it('judges each rule of a mixed typecheck list on its own', () => {
+    const violations = findAllowing(`// typecheck-disable-next-line @inflexa-ai/test-placement, @inflexa-ai/react/no-raw-state -- one reason`)
+    expect(violations).toHaveLength(1)
+    expect(violations[0].message).toContain('`@inflexa-ai/react/no-raw-state`')
   })
 
   it('counts an empty justification as none', () => {
@@ -174,6 +236,14 @@ describe('checkArchitectureDirectives', () => {
     expect(failed.status).toBe(1)
     expect(failed.stderr).toContain('src/page.tsx:2:1: `@inflexa-ai/react/no-raw-state` is an architecture rule')
     expect(run('src/clean.ts')).toMatchObject({ status: 0, stderr: '' })
+  })
+
+  it('fails the command for a typecheck directive and prints where it is', async () => {
+    await writeFile(path.join(root, 'src/typed.ts'), '// typecheck-disable-next-line @inflexa-ai/react/no-inline-query-key -- the query key is stable here\n')
+    const cli = fileURLToPath(new URL('../cli.ts', import.meta.url))
+    const failed = spawnSync(process.execPath, [cli, 'src/typed.ts'], { cwd: root, encoding: 'utf8' })
+    expect(failed.status).toBe(1)
+    expect(failed.stderr).toContain('src/typed.ts:1:1: `@inflexa-ai/react/no-inline-query-key` is an architecture rule')
   })
 
   it('takes the prefixes and the rules that can be disabled inline from the command line', () => {

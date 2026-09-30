@@ -30,7 +30,7 @@ Run the three tools in this sequence:
 oxlint && inflexa-typecheck && directive-guard
 ```
 
-`directive-guard` reports each disable directive that switches off a rule of this plugin with no entry in the lint configuration.
+`directive-guard` reports each `oxlint-disable` or `typecheck-disable-next-line` directive that switches off a rule of `@inflexa-ai/` with no entry in the lint configuration, and each `eslint-disable`, `typecheck-disable` or `typecheck-disable-line` directive, because no tool reads those forms.
 
 ## Documentation
 

@@ -20,11 +20,13 @@ export const ARCHITECTURE_RULES = {
   inlineAllowed: ['@inflexa-ai/test-placement'],
 }
 
-// oxlint reads the `oxlint-` form and switches off a rule of this repository.
-// No tool reads the `eslint-` form, which the guard reports whatever it names.
-const LINE_DIRECTIVE = /\/\/[ \t]*((?:es|ox)lint-disable)(?:-next-line|-line)?(?![\w-])([^\n]*)/g
+// oxlint obeys each `oxlint-` form, and `inflexa-typecheck` obeys the
+// `-next-line` typecheck form; both switch off a rule where the directive
+// stands. No tool reads the other forms, which the guard reports whatever they
+// name.
+const LINE_DIRECTIVE = /\/\/[^\S\r\n]*((?:(?:es|ox)lint|typecheck)-disable)(-next-line|-line)?(?![\w-])([^\n]*)/g
 // A block directive's rule list may wrap across lines.
-const BLOCK_DIRECTIVE = /\/\*\s*((?:es|ox)lint-disable)(?:-next-line|-line)?(?![\w-])([\s\S]*?)\*\//g
+const BLOCK_DIRECTIVE = /\/\*\s*((?:(?:es|ox)lint|typecheck)-disable)(-next-line|-line)?(?![\w-])([\s\S]*?)\*\//g
 
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs'])
 const SKIPPED_DIRECTORIES = new Set(['node_modules', 'dist', 'coverage', '.git'])
@@ -40,7 +42,10 @@ function positionAt(text: string, index: number): { line: number; column: number
 
 /**
  * Finds inline disable directives that switch off an architecture rule, either
- * by naming one or by naming nothing and so disabling everything.
+ * by naming one or, in a form that oxlint obeys, by naming nothing and so
+ * disabling everything. It also finds each directive of a form that no tool of
+ * this repository reads, because such a directive suppresses nothing and
+ * misleads the next reader.
  *
  * Silencing a rule is the cheapest way to make a lint error go away, and it
  * leaves the violation where no reviewer is looking. An exception to an
@@ -57,21 +62,33 @@ function positionAt(text: string, index: number): { line: number; column: number
  * disable directives: `/* oxlint-disable *\/` would suppress the report about
  * `/* oxlint-disable *\/`. It reads the source text, not the AST. The cost is
  * that directive text inside a string literal is matched as well; only code
- * that writes about lint directives can hit that.
+ * that writes about lint directives can hit that. It also matches a
+ * `typecheck-disable-next-line` directive whose rule id follows with no space,
+ * which `inflexa-typecheck` neither reads nor suppresses, and misses one in a
+ * block comment that never closes, which `inflexa-typecheck` reads to the end
+ * of the file. The line pattern admits the Unicode whitespace between `//` and
+ * the keyword, without the `\r` and `\n` terminators, because the command
+ * trims the comment text and so still starts a directive after such
+ * whitespace; a directive that only a stray CR or a line-separator character
+ * lets through hides no suppression, because the compiler fails such a file.
+ * Neither divergence hides a suppression: the directive with no space
+ * suppresses nothing, and a file with an unterminated comment fails the
+ * compile and reaches no merge.
  */
 export function findArchitectureDirectiveViolations(text: string, prefixes: string[], inlineAllowed: string[] = []): Violation[] {
   const violations: Violation[] = []
 
   for (const pattern of [LINE_DIRECTIVE, BLOCK_DIRECTIVE]) {
     for (const match of text.matchAll(pattern)) {
-      const [, keyword, directive] = match
+      const [, keyword, suffix, directive] = match
       const position = positionAt(text, match.index)
+      const form = suffix ? `${keyword}${suffix}` : keyword
+      const live = keyword === 'oxlint-disable' || (keyword === 'typecheck-disable' && suffix === '-next-line')
 
-      if (keyword === 'eslint-disable') {
+      if (!live) {
         violations.push({
           ...position,
-          message:
-            'No tool of this repository reads `eslint-disable`, so this directive suppresses nothing and misleads the next reader. Write `oxlint-disable` for an oxlint rule or `typecheck-disable-next-line` for a typed rule, with the reason after ` -- `, or remove the directive.',
+          message: `No tool of this repository reads \`${form}\`, so this directive suppresses nothing and misleads the next reader. Write \`oxlint-disable\` for an oxlint rule or \`typecheck-disable-next-line\` for a typed rule, with the reason after \` -- \`, or remove the directive.`,
         })
         continue
       }
@@ -85,10 +102,14 @@ export function findArchitectureDirectiveViolations(text: string, prefixes: stri
         .filter(Boolean)
 
       if (rules.length === 0) {
-        violations.push({
-          ...position,
-          message: `A blanket ${keyword} also switches off the architecture rules. Name the specific rule and give the reason after \` -- \`.`,
-        })
+        // `inflexa-typecheck` refuses a directive that names no rule, so a
+        // blanket typecheck directive suppresses nothing and gets no report.
+        if (keyword === 'oxlint-disable') {
+          violations.push({
+            ...position,
+            message: `A blanket ${keyword} also switches off the architecture rules. Name the specific rule and give the reason after \` -- \`.`,
+          })
+        }
         continue
       }
 
@@ -99,7 +120,7 @@ export function findArchitectureDirectiveViolations(text: string, prefixes: stri
           if (justification) continue
           violations.push({
             ...position,
-            message: `\`${rule}\` may be disabled here, but not silently: write \`${keyword} ${rule} -- <reason>\` so the next reader learns what makes this file the exception.`,
+            message: `\`${rule}\` may be disabled here, but not silently: write \`${form} ${rule} -- <reason>\` so the next reader learns what makes this file the exception.`,
           })
           continue
         }

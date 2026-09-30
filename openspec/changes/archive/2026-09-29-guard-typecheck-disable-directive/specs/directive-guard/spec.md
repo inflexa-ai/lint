@@ -1,10 +1,6 @@
-# directive-guard Specification
+# Spec Delta
 
-## Purpose
-
-An inline directive of either tool cannot switch off an architecture rule in silence, and no directive that no tool reads stays in the source, because a command outside the linters reads the directives.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: The command reports each inline disable of an architecture rule
 
@@ -58,12 +54,3 @@ The command SHALL accept an `oxlint-disable` or `typecheck-disable-next-line` di
 
 - **WHEN** the command gets `--allow-inline @inflexa-ai/test-placement`, and a file carries `// typecheck-disable-next-line @inflexa-ai/test-placement`
 - **THEN** the command reports the directive, and its message suggests `typecheck-disable-next-line @inflexa-ai/test-placement -- <reason>`
-
-### Requirement: The command walks the source files with a bound
-
-The command SHALL check the source files at or below each path that it gets, or below the working directory when it gets none. It SHALL skip `node_modules`, `dist`, `coverage` and `.git`, SHALL leave out each file that an `--ignore` glob matches, and SHALL keep a fixed number of file reads in flight.
-
-#### Scenario: An ignored folder
-
-- **WHEN** the command runs with `--ignore "src/samples/**"`
-- **THEN** it reports nothing for a file under `src/samples/`
