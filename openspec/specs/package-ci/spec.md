@@ -78,7 +78,7 @@ The npm release SHALL stage and publish `@inflexa-ai/typecheck`, `@inflexa-ai/ox
 #### Scenario: A dry run of the release
 
 - **WHEN** a person runs `node scripts/release.mjs` at `oxlint/`
-- **THEN** `.release/` holds a staged folder and a tarball at version `0.6.0` for `@inflexa-ai/typecheck`, `@inflexa-ai/oxlint-plugin`, `@inflexa-ai/oxlint-plugin-react` and `@inflexa-ai/oxlint-plugin-solid`, the staged manifests of the React and Solid packages name `@inflexa-ai/oxlint-plugin` at exactly `0.6.0`, the smoke run of `solid()` reports `no-interface` and a `solid/*` rule, and `npm ls --all` exits 0 in the smoke project
+- **THEN** `.release/` holds a staged folder and a tarball at the shared version of the workspace for `@inflexa-ai/typecheck`, `@inflexa-ai/oxlint-plugin`, `@inflexa-ai/oxlint-plugin-react` and `@inflexa-ai/oxlint-plugin-solid`, the staged manifests of the React and Solid packages name `@inflexa-ai/oxlint-plugin` at exactly that version, the smoke run of `solid()` reports `no-interface` and a `solid/*` rule, and `npm ls --all` exits 0 in the smoke project
 
 #### Scenario: A change of the Solid manifest on the default branch
 
