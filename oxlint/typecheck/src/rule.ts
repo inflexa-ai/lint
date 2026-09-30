@@ -1,5 +1,5 @@
-import type { Node, SourceFile, SyntaxKind } from 'typescript/unstable/ast'
-import type { Checker, Program } from 'typescript/unstable/sync'
+import type { Node, SourceFile, SyntaxKind } from '@typescript/native/unstable/ast'
+import type { Checker, Program } from '@typescript/native/unstable/sync'
 
 /** A value of an option, as JSON writes it. */
 export type OptionValue = string | number | boolean | null | OptionValue[] | { [key: string]: OptionValue }

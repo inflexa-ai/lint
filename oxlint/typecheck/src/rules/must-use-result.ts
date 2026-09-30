@@ -13,8 +13,8 @@ import {
   isYieldExpression,
   type Node,
   SyntaxKind,
-} from 'typescript/unstable/ast'
-import { isUnionType, type Type } from 'typescript/unstable/sync'
+} from '@typescript/native/unstable/ast'
+import { isUnionType, type Type } from '@typescript/native/unstable/sync'
 import type { RuleContext, RuleModule } from '../rule.ts'
 import { stringArraysOnly } from '../rule-options.ts'
 

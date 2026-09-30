@@ -12,6 +12,19 @@ Install `@inflexa-ai/oxlint-plugin` beside this package. The repository imports 
 
 Pin `oxlint` and `oxlint-tsgolint` to exact versions, because JS plugins and type-aware rules are not under semver.
 
+Hold the two TypeScript aliases in the `devDependencies` of the repository:
+
+```json
+{
+  "devDependencies": {
+    "@typescript/native": "npm:typescript@7.0.2",
+    "typescript": "npm:@typescript/typescript6@^6.0.2"
+  }
+}
+```
+
+`eslint-plugin-solid`, which this package installs, sits on `@typescript-eslint/utils` 8.71.0. Its peer range for `typescript` is `>=4.8.4 <6.1.0`, so on TypeScript 7 the peer finds no match and `npm ls --all` exits 1. typescript-eslint widens the range when TypeScript 7 ships the API that it waits for; the request is typescript-eslint/typescript-eslint#10940. The two lines above hold TypeScript 7 beside it: `@typescript/native` serves `tsc` and `inflexa-typecheck`, the name `typescript` holds TypeScript 6 for the editors and for the peer of `@typescript-eslint/utils`, and `npm ls --all` exits 0. A repository that installs `typescript` 7 flat keeps the invalid peer; the two lines are the repair.
+
 ## Use
 
 Call the factory in `oxlint.config.ts`, and apply the rules of this plugin to the folders of the repository:
@@ -42,7 +55,7 @@ The `version` option writes the major version of Solid to `settings.solid.versio
 
 `typescript()` bans each raw timer, and `solid()` keeps the ban. To let a component use `setInterval` with an `onCleanup`, set `syntax: { timers: false }`. A repository can also turn the ban off in its own blocks.
 
-oxlint gives a JS plugin no type information. Thus `inflexa-typecheck` of `@inflexa-ai/typecheck` runs the rules that read types, together with the type check of `tsc --noEmit`. Install `@inflexa-ai/typecheck` and `typescript` 7.0.2, and write `typecheck.config.ts`:
+oxlint gives a JS plugin no type information. Thus `inflexa-typecheck` of `@inflexa-ai/typecheck` runs the rules that read types, together with the type check of `tsc --noEmit`. Install `@inflexa-ai/typecheck` with the two TypeScript alias lines of the Install section, and write `typecheck.config.ts`:
 
 ```ts
 import { typecheck } from '@inflexa-ai/typecheck'

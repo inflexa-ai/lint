@@ -1,5 +1,5 @@
-import { type CallExpression, isCallExpression, isIdentifier, isSignatureDeclaration, type Node, SyntaxKind } from 'typescript/unstable/ast'
-import { isUnionType, type Signature, SignatureKind, SymbolFlags, type Type, TypeFlags } from 'typescript/unstable/sync'
+import { type CallExpression, isCallExpression, isIdentifier, isSignatureDeclaration, type Node, SyntaxKind } from '@typescript/native/unstable/ast'
+import { isUnionType, type Signature, SignatureKind, SymbolFlags, type Type, TypeFlags } from '@typescript/native/unstable/sync'
 import { indirectionOf } from '../helpers/reflective-calls.ts'
 import type { RuleModule } from '../rule.ts'
 import { stringArraysOnly } from '../rule-options.ts'

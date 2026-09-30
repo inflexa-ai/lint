@@ -169,10 +169,13 @@ run(
     ...staged.map(({ tarball }) => tarball),
     `oxlint@${root.devDependencies.oxlint}`,
     `oxlint-tsgolint@${root.devDependencies['oxlint-tsgolint']}`,
+    `@typescript/native@${root.devDependencies['@typescript/native']}`,
     `typescript@${root.devDependencies.typescript}`,
   ],
   smoke,
 )
+// The peer of `@typescript-eslint/utils` resolves to TypeScript 6 only in this layout, so an invalid tree stops the release here.
+run('npm', ['ls', '--all'], smoke)
 const lint = capture('npx', ['--no-install', 'oxlint'], smoke)
 if (lint.status !== 1 || !lint.stdout.includes('@inflexa-ai(no-interface)')) fail(`the smoke run of oxlint did not report no-interface:\n${lint.stdout}\n${lint.stderr}`)
 const solidLint = capture('npx', ['--no-install', 'oxlint', '-c', 'oxlint.solid.config.ts'], smoke)

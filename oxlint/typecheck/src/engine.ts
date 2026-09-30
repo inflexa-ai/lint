@@ -1,5 +1,5 @@
-import type { Node, SourceFile } from 'typescript/unstable/ast'
-import type { Checker, Program } from 'typescript/unstable/sync'
+import type { Node, SourceFile } from '@typescript/native/unstable/ast'
+import type { Checker, Program } from '@typescript/native/unstable/sync'
 import type { ActiveRule } from './config.ts'
 import type { ReportData } from './rule.ts'
 

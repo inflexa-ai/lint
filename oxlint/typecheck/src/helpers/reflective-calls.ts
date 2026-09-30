@@ -11,8 +11,8 @@ import {
   isSpreadElement,
   type Node,
   SyntaxKind,
-} from 'typescript/unstable/ast'
-import type { Signature } from 'typescript/unstable/sync'
+} from '@typescript/native/unstable/ast'
+import type { Signature } from '@typescript/native/unstable/sync'
 
 /**
  * The interfaces that give every function `call`, `apply` and `bind`. A call

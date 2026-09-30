@@ -1,4 +1,4 @@
-import { type Node, type SourceFile, SyntaxKind } from 'typescript/unstable/ast'
+import { type Node, type SourceFile, SyntaxKind } from '@typescript/native/unstable/ast'
 import type { RuleReport } from './engine.ts'
 
 export const DIRECTIVE = 'typecheck-disable-next-line'

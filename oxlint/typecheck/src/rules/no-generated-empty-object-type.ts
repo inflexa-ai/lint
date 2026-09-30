@@ -1,5 +1,5 @@
-import { isTypeReferenceNode, type Node, SyntaxKind } from 'typescript/unstable/ast'
-import { isObjectType, isUnionType, ObjectFlags, SignatureKind, type Type } from 'typescript/unstable/sync'
+import { isTypeReferenceNode, type Node, SyntaxKind } from '@typescript/native/unstable/ast'
+import { isObjectType, isUnionType, ObjectFlags, SignatureKind, type Type } from '@typescript/native/unstable/sync'
 import type { RuleModule } from '../rule.ts'
 
 /**
