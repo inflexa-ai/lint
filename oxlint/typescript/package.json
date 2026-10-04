@@ -53,7 +53,7 @@
   },
   "dependencies": {
     "@oxlint/plugins": "^1.85.0",
-    "oxlint-plugin-eslint": "^1.85.0"
+    "oxlint-plugin-eslint": "^1.86.0"
   },
   "devDependencies": {
     "globals": "^17.12.0",
