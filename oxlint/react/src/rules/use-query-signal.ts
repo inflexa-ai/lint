@@ -1,4 +1,14 @@
 import type { ESTree, Reference, Rule, Scope } from '@oxlint/plugins'
+import { optionObject, stringOption } from '@inflexa-ai/oxlint-plugin/helpers/rule-options'
+
+/** The options of the rule, once oxlint has merged `meta.defaultOptions` into them. */
+type Options = { hint: string }
+
+const DEFAULTS: Options = { hint: '' }
+
+const ignoredSignalMessage = (combineAdvice: string): string =>
+  'This query function ignores the `signal` its first argument carries, so nothing cancels the request when the component unmounts and its answer still reaches the cache. Read it, `({ signal }) => …`, and pass it on to the call. ' +
+  combineAdvice
 
 /** A property of an object literal or of a destructuring pattern. */
 type Property = ESTree.ObjectProperty | ESTree.BindingProperty
@@ -98,13 +108,23 @@ export const useQuerySignal: Rule = {
       description: 'Use the signal a query library hands the query function',
       url: 'https://github.com/inflexa-ai/lint/blob/main/docs/rules/use-query-signal.md',
     },
-    schema: [],
+    schema: [
+      {
+        type: 'object',
+        properties: { hint: { type: 'string' } },
+        additionalProperties: false,
+      },
+    ],
+    defaultOptions: [DEFAULTS],
     messages: {
-      ignoredSignal:
-        'This query function ignores the `signal` its first argument carries, so nothing cancels the request when the component unmounts and its answer still reaches the cache. Read it, `({ signal }) => …`, and pass it on to the call. To bound the request as well, combine them: `AbortSignal.any([signal, AbortSignal.timeout(ms)])`. `AbortSignal.any` first shipped in Chrome 116, Edge 116, Firefox 124 and Safari 17.4, and the document of this rule links to a form for an older browser.',
+      ignoredSignal: ignoredSignalMessage(
+        'To bound the request as well, combine them: `AbortSignal.any([signal, AbortSignal.timeout(ms)])`. `AbortSignal.any` first shipped in Chrome 116, Edge 116, Firefox 124 and Safari 17.4, and the document of this rule links to a form for an older browser.',
+      ),
+      ignoredSignalWithHint: ignoredSignalMessage('{{hint}}'),
     },
   },
   create(context) {
+    const hint = stringOption(optionObject(context.options), 'hint', DEFAULTS.hint)
     return {
       Property(node) {
         const queryFn = node.value
@@ -116,7 +136,7 @@ export const useQuerySignal: Rule = {
         const parameter = queryFn.params[0]
         if (queryFn.params.length > 0 && readsSignal(parameter, context.sourceCode.getScope(queryFn))) return
 
-        context.report({ node: queryFn, messageId: 'ignoredSignal' })
+        context.report(hint ? { node: queryFn, messageId: 'ignoredSignalWithHint', data: { hint } } : { node: queryFn, messageId: 'ignoredSignal' })
       },
     }
   },

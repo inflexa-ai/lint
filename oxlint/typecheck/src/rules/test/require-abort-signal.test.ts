@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest'
 import { requireAbortSignal } from '../require-abort-signal.ts'
 import { createRuleTester } from './rule-tester.ts'
 
@@ -71,6 +72,22 @@ createRuleTester().run('require-abort-signal', requireAbortSignal, {
       ...typed(`void api.get('/projects', { signal: maybe })`),
       errors: [{ messageId: 'missingSignal', data: { problem: 'its `signal` may be `undefined`' } }],
     },
+    // The hint of a repository takes the place of the advice to combine signals.
+    {
+      ...typed(`void api.get('/projects', loose)`),
+      options: { ...options, hint: 'Use signal.withDeadline(ms) or signal.or(...others).' },
+      errors: [
+        {
+          messageId: 'missingSignalWithHint',
+          data: { problem: 'its `signal` is optional, so it may be missing', hint: 'Use signal.withDeadline(ms) or signal.or(...others).' },
+        },
+      ],
+    },
+    {
+      ...typed(`void api.get('/projects', loose)`),
+      options: { ...options, hint: '' },
+      errors: [{ messageId: 'missingSignal', data: { problem: 'its `signal` is optional, so it may be missing' } }],
+    },
     reported(`void api.get('/projects', untyped)`),
     // The same method, reached every other way a caller can reach it.
     reported(`const get = api.get\nvoid get('/projects')`),
@@ -112,4 +129,14 @@ createRuleTester().run('require-abort-signal', requireAbortSignal, {
     // An untrusted client is the same client.
     reported(`void pubchem.get('/compounds/aspirin', { schema: undefined as never })`),
   ],
+})
+
+describe('missingSignalWithHint', () => {
+  it('keeps the message and puts the hint in place of the advice to combine signals', () => {
+    const template = requireAbortSignal.meta.messages.missingSignalWithHint
+    expect(template).toContain('{{hint}}')
+    expect(template).toContain('`AbortSignal.timeout(ms)`')
+    expect(template).toContain('A wrapper declares `signal: AbortSignal`')
+    expect(template).not.toContain('AbortSignal.any')
+  })
 })

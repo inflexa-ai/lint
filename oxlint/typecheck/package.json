@@ -1,6 +1,6 @@
 {
   "name": "@inflexa-ai/typecheck",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "The type check of Inflexa on TypeScript 7: the diagnostics of tsc --noEmit and the typed rules in one command.",
   "keywords": [
     "typescript",
