@@ -48,6 +48,6 @@
   "dependencies": {
     "@inflexa-ai/oxlint-plugin": "^0.7.0",
     "@oxlint/plugins": "^1.85.0",
-    "eslint-plugin-solid": "^0.18.0"
+    "eslint-plugin-solid": "^0.18.1"
   }
 }
