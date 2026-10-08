@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 const repoRoot = fileURLToPath(new URL('../../../../../', import.meta.url))
 
 /** A plugin of oxlint or of `inflexa-typecheck`: each rule names its document in `meta.docs.url`. */
-type DocumentedPlugin = { rules?: Record<string, { meta?: { docs?: { url?: string } } }> }
+type DocumentedPlugin = { rules?: Record<string, { meta?: { docs?: { url?: string }; messages?: Record<string, string> } }> }
 
 /** Each rule of a plugin that does not link to its document `docs/rules/<prefix><rule>.md`, or whose document is missing. */
 export function ruleDocumentProblems(plugin: DocumentedPlugin, prefix = ''): string[] {
@@ -21,6 +21,23 @@ export function ruleDocumentProblems(plugin: DocumentedPlugin, prefix = ''): str
     if (url !== expected) problems.push(`${name}: meta.docs.url is ${url ?? 'missing'}, not ${expected}`)
     if (!existsSync(file)) problems.push(`${name}: ${file} is missing`)
     return problems
+  })
+}
+
+/** The first versions that ship `AbortSignal.any`, after the browser compatibility data of MDN. */
+const abortSignalAnyBrowsers = ['Chrome 116', 'Edge 116', 'Firefox 124', 'Safari 17.4']
+
+/** Each message and each document of a rule that advises `AbortSignal.any` without one of the first browser versions that ship it. */
+export function abortSignalAnyProblems(plugin: DocumentedPlugin, prefix = ''): string[] {
+  return Object.entries(plugin.rules ?? {}).flatMap(([name, rule]) => {
+    const texts = Object.entries(rule.meta?.messages ?? {}).map(([id, message]) => ({ where: `the message ${id}`, text: message }))
+    const file = path.join(repoRoot, 'docs', 'rules', `${prefix}${name}.md`)
+    if (existsSync(file)) texts.push({ where: 'the document', text: readFileSync(file, 'utf8') })
+    return texts
+      .filter(({ text }) => text.includes('AbortSignal.any'))
+      .flatMap(({ where, text }) =>
+        abortSignalAnyBrowsers.filter((browser) => !text.includes(browser)).map((browser) => `${name}: ${where} advises AbortSignal.any without ${browser}`),
+      )
   })
 }
 

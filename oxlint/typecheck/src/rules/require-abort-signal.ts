@@ -42,7 +42,7 @@ export const requireAbortSignal: RuleModule<Options> = {
       indirectCall:
         'This call goes through `{{through}}`, where the options cannot be read, so nothing here can tell whether the request carries a `signal`. Call the method directly, `api.get(path, { signal })`: app code has no need for the indirection, and reaching for it is how a request ends up with nothing to cancel it.',
       missingSignal:
-        'This call cannot be cancelled: {{problem}}. Pass a `signal` typed `AbortSignal`, not `AbortSignal | undefined`. Inside a query function it is the `signal` of the context the library hands you. Where nothing can cancel the call, a mutation among them, it is a deadline: `AbortSignal.timeout(ms)`. Where both exist, combine them with `AbortSignal.any([signal, AbortSignal.timeout(ms)])`. A wrapper declares `signal: AbortSignal` in its own options and the compiler asks its callers.',
+        'This call cannot be cancelled: {{problem}}. Pass a `signal` typed `AbortSignal`, not `AbortSignal | undefined`. Inside a query function it is the `signal` of the context the library hands you. Where nothing can cancel the call, a mutation among them, it is a deadline: `AbortSignal.timeout(ms)`. Where both exist, combine them with `AbortSignal.any([signal, AbortSignal.timeout(ms)])`. `AbortSignal.any` first shipped in Chrome 116, Edge 116, Firefox 124 and Safari 17.4, and the document of this rule gives a form for an older browser. A wrapper declares `signal: AbortSignal` in its own options and the compiler asks its callers.',
     },
   },
   checkOptions: stringArraysOnly,

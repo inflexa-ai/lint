@@ -10,7 +10,7 @@ A deadline of its own satisfies `require-abort-signal` and ends nothing at unmou
 
 ## What the rule reports
 
-- A query function, written in place beside its `queryKey`, that does not read the `signal` of its first argument. Read it, as in `({ signal }) => …`, and pass it on to the call. To bound the request as well, combine them: `AbortSignal.any([signal, AbortSignal.timeout(ms)])`.
+- A query function, written in place beside its `queryKey`, that does not read the `signal` of its first argument. Read it, as in `({ signal }) => …`, and pass it on to the call. To bound the request as well, combine them: `AbortSignal.any([signal, AbortSignal.timeout(ms)])`. `AbortSignal.any` first shipped in Chrome 116, Edge 116, Firefox 124 and Safari 17.4. For an older browser, use the function in [Combine signals in an older browser](./require-abort-signal.md#combine-signals-in-an-older-browser).
 
 ## What the rule leaves alone
 
