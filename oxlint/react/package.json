@@ -1,6 +1,6 @@
 {
   "name": "@inflexa-ai/oxlint-plugin-react",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "The oxlint rules and configuration of Inflexa for React applications, and the typed rules of React for inflexa-typecheck.",
   "keywords": [
     "oxlint",
@@ -47,7 +47,7 @@
     "test": "vitest run"
   },
   "peerDependencies": {
-    "@inflexa-ai/typecheck": "^0.6.0",
+    "@inflexa-ai/typecheck": "^0.6.1",
     "eslint-plugin-better-tailwindcss": "^4.7.0",
     "eslint-plugin-react-doctor": "^0.9.14",
     "oxlint": "^1.85.0",
@@ -65,7 +65,7 @@
     }
   },
   "dependencies": {
-    "@inflexa-ai/oxlint-plugin": "^0.6.0",
+    "@inflexa-ai/oxlint-plugin": "^0.6.1",
     "@oxlint/plugins": "^1.85.0",
     "@tanstack/eslint-plugin-query": "^5.103.2",
     "@tanstack/eslint-plugin-router": "^1.162.0",
