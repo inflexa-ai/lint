@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { portedDocumentProblems, ruleDocumentProblems } from '../../../../typescript/src/rules/test/rule-documents.ts'
+import { abortSignalAnyProblems, portedDocumentProblems, ruleDocumentProblems } from '../../../../typescript/src/rules/test/rule-documents.ts'
 import { rules } from '../index.ts'
 
 describe('documentation', () => {
@@ -9,5 +9,9 @@ describe('documentation', () => {
 
   it('names the upstream package and its license in the document of each port', () => {
     expect(portedDocumentProblems({ 'must-use-result': '@ninoseki/eslint-plugin-neverthrow', 'no-generated-empty-object-type': 'typescript-eslint' })).toEqual([])
+  })
+
+  it('names the first browser versions of AbortSignal.any wherever a rule advises it', () => {
+    expect(abortSignalAnyProblems({ rules })).toEqual([])
   })
 })

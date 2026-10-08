@@ -12,7 +12,27 @@ A request that nobody can end outlives the thing that asked for it. A query func
 - A call whose options are typed `any`. The type `any` promises no `signal` at all.
 - A call that goes through an indirection, where the options cannot be read. Call the method directly, as in `api.get(path, { signal })`. App code has no use for the indirection.
 
-Where nothing in the program can cancel the call, a mutation among them, use a deadline: `AbortSignal.timeout(ms)`. Where both exist, combine them with `AbortSignal.any([signal, AbortSignal.timeout(ms)])`. A wrapper declares `signal: AbortSignal` in its own options, and the compiler then asks its callers for one.
+Where nothing in the program can cancel the call, a mutation among them, use a deadline: `AbortSignal.timeout(ms)`. Where both exist, combine them with `AbortSignal.any([signal, AbortSignal.timeout(ms)])`. `AbortSignal.any` first shipped in Chrome 116, Edge 116, Firefox 124 and Safari 17.4. For an older browser, use the function in [Combine signals in an older browser](#combine-signals-in-an-older-browser). A wrapper declares `signal: AbortSignal` in its own options, and the compiler then asks its callers for one.
+
+## Combine signals in an older browser
+
+`anySignal` aborts its signal when one of the given signals aborts, with the reason of that signal. It uses only APIs that Chrome 98, Edge 98, Firefox 97 and Safari 15.4 ship. When its signal aborts, it removes its listeners from the given signals.
+
+```ts
+function anySignal(signals: AbortSignal[]): AbortSignal {
+  const controller = new AbortController()
+  for (const signal of signals) {
+    if (signal.aborted) {
+      controller.abort(signal.reason)
+      break
+    }
+    signal.addEventListener('abort', () => controller.abort(signal.reason), { signal: controller.signal })
+  }
+  return controller.signal
+}
+```
+
+Pass its signal to the call, as in `api.get(path, { signal: anySignal([signal, AbortSignal.timeout(ms)]) })`.
 
 ## How the rule decides
 

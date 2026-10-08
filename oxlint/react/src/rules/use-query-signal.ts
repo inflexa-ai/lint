@@ -101,7 +101,7 @@ export const useQuerySignal: Rule = {
     schema: [],
     messages: {
       ignoredSignal:
-        'This query function ignores the `signal` its first argument carries, so nothing cancels the request when the component unmounts and its answer still reaches the cache. Read it, `({ signal }) => …`, and pass it on to the call. To bound the request as well, combine them: `AbortSignal.any([signal, AbortSignal.timeout(ms)])`.',
+        'This query function ignores the `signal` its first argument carries, so nothing cancels the request when the component unmounts and its answer still reaches the cache. Read it, `({ signal }) => …`, and pass it on to the call. To bound the request as well, combine them: `AbortSignal.any([signal, AbortSignal.timeout(ms)])`. `AbortSignal.any` first shipped in Chrome 116, Edge 116, Firefox 124 and Safari 17.4, and the document of this rule links to a form for an older browser.',
     },
   },
   create(context) {
