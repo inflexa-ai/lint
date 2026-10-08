@@ -4,7 +4,12 @@ import { indirectionOf } from '../helpers/reflective-calls.ts'
 import type { RuleModule } from '../rule.ts'
 import { stringArraysOnly } from '../rule-options.ts'
 
-type Options = { declaredIn: string[] }
+type Options = { declaredIn: string[]; hint: string }
+
+const missingSignalMessage = (combineAdvice: string): string =>
+  'This call cannot be cancelled: {{problem}}. Pass a `signal` typed `AbortSignal`, not `AbortSignal | undefined`. Inside a query function it is the `signal` of the context the library hands you. Where nothing can cancel the call, a mutation among them, it is a deadline: `AbortSignal.timeout(ms)`. ' +
+  combineAdvice +
+  ' A wrapper declares `signal: AbortSignal` in its own options and the compiler asks its callers.'
 
 const DECLARATION_FILE = /\.d\.[cm]?ts$/i
 
@@ -37,18 +42,20 @@ export const requireAbortSignal: RuleModule<Options> = {
       description: 'Require an AbortSignal on every call into the API client and on every fetch',
       url: 'https://github.com/inflexa-ai/lint/blob/main/docs/rules/require-abort-signal.md',
     },
-    defaultOptions: { declaredIn: [] },
+    defaultOptions: { declaredIn: [], hint: '' },
     messages: {
       indirectCall:
         'This call goes through `{{through}}`, where the options cannot be read, so nothing here can tell whether the request carries a `signal`. Call the method directly, `api.get(path, { signal })`: app code has no need for the indirection, and reaching for it is how a request ends up with nothing to cancel it.',
-      missingSignal:
-        'This call cannot be cancelled: {{problem}}. Pass a `signal` typed `AbortSignal`, not `AbortSignal | undefined`. Inside a query function it is the `signal` of the context the library hands you. Where nothing can cancel the call, a mutation among them, it is a deadline: `AbortSignal.timeout(ms)`. Where both exist, combine them with `AbortSignal.any([signal, AbortSignal.timeout(ms)])`. `AbortSignal.any` first shipped in Chrome 116, Edge 116, Firefox 124 and Safari 17.4, and the document of this rule gives a form for an older browser. A wrapper declares `signal: AbortSignal` in its own options and the compiler asks its callers.',
+      missingSignal: missingSignalMessage(
+        'Where both exist, combine them with `AbortSignal.any([signal, AbortSignal.timeout(ms)])`. `AbortSignal.any` first shipped in Chrome 116, Edge 116, Firefox 124 and Safari 17.4, and the document of this rule gives a form for an older browser.',
+      ),
+      missingSignalWithHint: missingSignalMessage('{{hint}}'),
     },
   },
   checkOptions: stringArraysOnly,
   create(context) {
     const { checker } = context
-    const { declaredIn } = context.options
+    const { declaredIn, hint } = context.options
 
     // With no pattern to match there is no client to recognise.
     if (declaredIn.length === 0) return {}
@@ -150,7 +157,8 @@ export const requireAbortSignal: RuleModule<Options> = {
         if (!signatureIsTarget(signature)) return
 
         const problem = problemWith(call, signature)
-        if (problem !== undefined) context.report({ node: call, messageId: 'missingSignal', data: { problem } })
+        if (problem === undefined) return
+        context.report(hint ? { node: call, messageId: 'missingSignalWithHint', data: { problem, hint } } : { node: call, messageId: 'missingSignal', data: { problem } })
       },
     }
   },

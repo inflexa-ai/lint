@@ -3,6 +3,7 @@ import { createRuleTester } from './rule-tester.ts'
 
 const ruleTester = createRuleTester()
 const ignored = [{ messageId: 'ignoredSignal' as const }]
+const hint = 'Use signal.withDeadline(ms) or signal.or(...others).'
 
 ruleTester.run('use-query-signal', useQuerySignal, {
   valid: [
@@ -64,5 +65,18 @@ ruleTester.run('use-query-signal', useQuerySignal, {
     // Method shorthand and a function expression are written in place too.
     { code: `useQuery({ queryKey: ['p'], queryFn() { return api.get('/p') } })`, errors: ignored },
     { code: `useQuery({ queryKey: ['p'], queryFn: async function (context) { return api.get('/p') } })`, errors: ignored },
+    // The hint of a repository takes the place of the advice to combine signals.
+    {
+      code: `useQuery({ queryKey: ['p'], queryFn: () => api.get('/p') })`,
+      options: [{ hint }],
+      errors: [
+        {
+          message:
+            'This query function ignores the `signal` its first argument carries, so nothing cancels the request when the component unmounts and its answer still reaches the cache. Read it, `({ signal }) => …`, and pass it on to the call. ' +
+            hint,
+        },
+      ],
+    },
+    { code: `useQuery({ queryKey: ['p'], queryFn: () => api.get('/p') })`, options: [{ hint: '' }], errors: ignored },
   ],
 })

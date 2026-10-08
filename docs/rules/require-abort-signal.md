@@ -57,3 +57,4 @@ export default typecheck({
 ## Options
 
 - `declaredIn` — the files that declare the functions of the client, as regular expressions. The rule tests each expression on the file name of the declaration, as the file system spells it. Default: `[]`. With no file named, the rule reports nothing.
+- `hint` — the advice of the repository to combine a signal with a deadline, for example `'Use signal.withDeadline(ms) or signal.or(...others).'`. The message gives the hint in place of the advice to use `AbortSignal.any`. Write the hint as one or more sentences, each with a period at its end. Default: `''`, which keeps that advice.

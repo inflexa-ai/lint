@@ -25,3 +25,7 @@ The rule looks for a `queryKey` beside the `queryFn`, wherever the object is wri
 The rule asks the scope whether the function reads the signal, through a property or through a member access. A destructured `signal` that the body never mentions again drops the signal at the destructure. That leaves the request as uncancellable as one that never asked for a signal.
 
 `@typescript-eslint/no-unused-vars` reports the dropped signal too, as a variable that nobody uses, and its suggestion is to remove the destructure. The correct fix is to pass the signal on.
+
+## Options
+
+- `hint` — the advice of the repository to combine a signal with a deadline, for example `'Use signal.withDeadline(ms) or signal.or(...others).'`. The message gives the hint in place of the advice to use `AbortSignal.any`. Write the hint as one or more sentences, each with a period at its end. Default: `''`, which keeps that advice.
