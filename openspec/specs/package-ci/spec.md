@@ -2,23 +2,38 @@
 
 ## Purpose
 
-Every pull request runs the tests of the published packages and of the Go module, and a push to the default branch publishes the package whose version is new, through OIDC with no token in the repository.
+Every pull request runs the tests of each package that it changes, and a push to the default branch publishes the package whose version is new, through OIDC with no token in the repository.
 
 ## Requirements
 
 ### Requirement: Each pull request runs the package tests
 
-The repository SHALL run `npm ci`, `npm run format:check`, `npm run lint` and `npm test` at `oxlint/` on Node 24 for each pull request, and SHALL run `test -z "$(gofmt -l .)"`, `go vet ./...` and `go test -count=1 ./...` at `golint/` with the Go version of `golint/go.mod` for each pull request, so a change that breaks a package, its self-lint or its format cannot merge without a run that shows it.
+The repository SHALL run `npm ci`, `npm run format:check`, `npm run lint` and `npm test` at `oxlint/` on Node 24 for each pull request that changes a file under `oxlint/` or `docs/rules/`, or `.github/workflows/test.yml`. It SHALL run `test -z "$(gofmt -l .)"`, `go vet ./...` and `go test -count=1 ./...` at `golint/` with the Go version of `golint/go.mod` for each pull request that changes a file under `golint/` or `docs/rules/`, or `.github/workflows/test.yml`. Thus a change that breaks a package, its self-lint or its format cannot merge without a run that shows it, and a pull request that does not change a package does not run its tests. The test workflow SHALL start for each pull request and SHALL skip a package job through a job condition, never through a path filter of the workflow, because a skipped job reports success to a required check while a skipped workflow leaves the check pending. When the job that finds the changes fails, both package jobs SHALL run.
 
 #### Scenario: A pull request runs the tests
 
-- **WHEN** a pull request opens or gains a push
+- **WHEN** a pull request that changes a file under `oxlint/` opens or gains a push
 - **THEN** the workflow installs the workspace with `npm ci`, and runs `npm run format:check`, `npm run lint` and `npm test` at `oxlint/` on Node 24
 
 #### Scenario: A pull request runs the Go checks
 
-- **WHEN** a pull request opens or gains a push
+- **WHEN** a pull request that changes a file under `golint/` opens or gains a push
 - **THEN** the workflow sets up Go from `golint/go.mod` with the module cache keyed on `golint/go.sum`, and runs `test -z "$(gofmt -l .)"`, `go vet ./...` and `go test -count=1 ./...` at `golint/`
+
+#### Scenario: A pull request that changes one package
+
+- **WHEN** a pull request changes files under `oxlint/` and no file under `golint/` or `docs/rules/`, and does not change `.github/workflows/test.yml`
+- **THEN** the job `Format, vet and test at golint/` skips and reports success, and its required check does not block the merge
+
+#### Scenario: The rule documents change
+
+- **WHEN** a pull request changes a file under `docs/rules/`
+- **THEN** both package jobs run, because the tests of each package read the rule documents
+
+#### Scenario: The changes cannot be found
+
+- **WHEN** the job that finds the changed packages fails
+- **THEN** both package jobs run
 
 ### Requirement: A new package version publishes with OIDC
 
@@ -41,7 +56,7 @@ Each job of the test workflow and of the release workflows SHALL run on `ubuntu-
 #### Scenario: A pull request from a fork
 
 - **WHEN** a pull request from a fork opens or gains a push
-- **THEN** the jobs `Format, lint and test at oxlint/` and `Format, vet and test at golint/` run on a GitHub-hosted `ubuntu-latest` runner
+- **THEN** each job of the test workflow that runs, `Format, lint and test at oxlint/` and `Format, vet and test at golint/` among them, runs on a GitHub-hosted `ubuntu-latest` runner
 
 #### Scenario: A release on the default branch
 

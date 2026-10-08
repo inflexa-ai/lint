@@ -1,5 +1,10 @@
 name: Test
 
+# Each package job runs only when the pull request changes that package,
+# docs/rules/ (the tests of both packages read it), or this file. A job skips
+# through `if`, never through `paths`: a required check of a skipped workflow
+# stays pending and blocks the merge, while a skipped job reports success. If
+# `changes` fails, its outputs are empty, thus both package jobs run.
 on:
   pull_request:
 
@@ -7,8 +12,32 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    name: Find the changed packages
+    runs-on: ubuntu-latest
+    outputs:
+      oxlint: ${{ steps.diff.outputs.oxlint }}
+      golint: ${{ steps.diff.outputs.golint }}
+    steps:
+      # The merge commit of the pull request and its first parent, the tip of the base branch.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+      - id: diff
+        shell: bash
+        run: |
+          changed=$(git diff --name-only HEAD^1 HEAD)
+          for package in oxlint golint; do
+            if grep -qE "^(${package}/|docs/rules/|\.github/workflows/test\.yml$)" <<<"$changed"; then
+              echo "${package}=true" >>"$GITHUB_OUTPUT"
+            else
+              echo "${package}=false" >>"$GITHUB_OUTPUT"
+            fi
+          done
   test:
     name: Format, lint and test at oxlint/
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.oxlint != 'false' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -31,6 +60,8 @@ jobs:
         run: npm test
   golint:
     name: Format, vet and test at golint/
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.golint != 'false' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
