@@ -13,6 +13,12 @@ createRuleTester().run('require-assertion-safety', requireAssertionSafety, {
     // A SAFETY comment on the statement that holds the assertion answers too.
     `function read() {\n  // SAFETY: the backend contract is ours\n  return parsed as TResponse\n}`,
     `// SAFETY: built by the runtime a line above\nconst el = ref.current as HTMLDivElement`,
+    // A statement in a body without braces belongs to its `if` or loop.
+    `// SAFETY: the guard narrows it\nif (isNode(value)) return value as ElementNode`,
+    `// SAFETY: each branch narrows it\nif (a) f()\nelse if (b) g(value as ElementNode)`,
+    `// SAFETY: each entry is a number\nfor (const v of values) total += v as number`,
+    // A comment above an exported declaration answers for the assertion in it.
+    `// SAFETY: the runtime built it\nexport const el = ref.current as HTMLDivElement`,
     // No assertion, nothing to justify.
     `const user = UserSchema.parse(data)`,
     `const value = input satisfies Config`,
@@ -27,6 +33,10 @@ createRuleTester().run('require-assertion-safety', requireAssertionSafety, {
     { code: `const node = value as ElementNode // SAFETY: too late`, errors: [missing] },
     // The angle-bracket form is the same assertion.
     { filename: 'legacy.ts', code: `const node = <ElementNode>value`, errors: [missing] },
+    // A comment above an `if` does not reach into its block.
+    { code: `function f() {\n  // SAFETY: the guard narrows it\n  if (isNode(value)) {\n    return value as ElementNode\n  }\n}`, errors: [missing] },
+    // A comment above a function does not reach a cast in an `if` test.
+    { code: `// SAFETY: the flag is a boolean\nfunction f() {\n  if (flag as boolean) {}\n}`, errors: [missing] },
     // Each assertion answers for itself.
     { code: `const pair = [a as First, b as Second]`, errors: [missing, missing] },
   ],

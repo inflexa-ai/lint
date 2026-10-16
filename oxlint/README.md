@@ -22,8 +22,15 @@ The TypeScript and React packages export the pieces that a repository applies
 to its own zones: `vitest` for the test files, `tanstack` for the application
 code, and `testingLibrary` and `playwright` for the component tests and the
 end-to-end tests. React Doctor comes through the `reactDoctor` option of the `react`
-factory. Its capability setting belongs to the root configuration, and oxlint
-reads the settings of the root only.
+factory. Its settings belong to the root configuration, and oxlint reads the
+settings of the root only.
+
+The `reactVersion` of the option gives React Doctor the version capabilities,
+`react:17` up to `react:<major>` and `react:19.2` from React 19.2. React Doctor
+then does not run the rules for an older React. The plugin does not read the
+`requires` list of a rule in oxlint. Thus a rule for a newer React also runs on
+an older React. `react()` also keeps the settings of the React Doctor configs
+whose rules it copies, for example `portedRuleMode: 'curated'`.
 
 Two parts of the lint cannot run in oxlint:
 
@@ -54,7 +61,7 @@ import { vitest } from '@inflexa-ai/oxlint-plugin'
 import { playwright, react, tanstack, testingLibrary } from '@inflexa-ai/oxlint-plugin-react'
 
 export default react({
-  reactDoctor: { files: ['apps/*/src/**', 'packages/*/src/**'] },
+  reactDoctor: { reactVersion: '19.3', files: ['apps/*/src/**', 'packages/*/src/**'] },
   tailwind: { entryPoint: 'src/app.css' },
   overrides: [
     { files: ['src/**'], ...tanstack },
@@ -157,6 +164,124 @@ the workspace, with the settings in [`.oxfmtrc.json`](./.oxfmtrc.json).
 `npm run lint` also runs jscpd with the settings in [`.jscpd.json`](./.jscpd.json).
 jscpd fails when a block of code occurs in more than one place. Put an operation
 that more than one module uses in a shared helper. Then import the helper.
+
+## Limits of the upstream rules
+
+Some rules that `typescript()` turns on report code that is correct. The rules
+stay on, because they find real defects in other code. Each entry names the
+versions where a probe saw the report. It tells if typescript-eslint reports the
+same code, and it gives a workaround that compiles and that the rule does not
+report. After an update of oxlint or oxlint-tsgolint, do the probes again.
+
+### `typescript/no-unnecessary-type-assertion`
+
+- Seen in: oxlint 1.85.0 with oxlint-tsgolint 7.0.2003.
+- Report: the rule reports a cast to an intersection that adds a member, when a
+  later access reads that member. If you remove the cast, TypeScript reports
+  TS2339 on the access.
+- typescript-eslint 8.64.0: does not report the cast. The difference is in
+  tsgolint.
+- Workaround: give the variable the type as an annotation. The compiler accepts
+  the assignment, and the rule has no cast to report.
+
+```ts
+// Reported
+const init = inits[0] as (RequestInit & { timeout?: unknown }) | undefined
+// Not reported
+const init: (RequestInit & { timeout?: unknown }) | undefined = inits[0]
+```
+
+### `typescript/no-deprecated`
+
+- Seen in: oxlint 1.85.0 with oxlint-tsgolint 7.0.2003.
+- Report: when one member of a union deprecates a property, the rule reports
+  each read of that property on the union. This includes the read of a
+  discriminant. TypeScript counts a union property as deprecated only when each
+  declaration deprecates it.
+- typescript-eslint 8.64.0: reports the same code.
+- Workaround: narrow the union with `in` on a property that only the member that
+  the code reads has. The read then does not touch the deprecated declaration.
+
+```ts
+type Part =
+  | { type: 'text'; text: string }
+  | {
+      /** @deprecated Use 'file' instead. */
+      type: 'file-data'
+      data: string
+    }
+  | { type: 'file'; data: string }
+
+// Reported
+part.type === 'text' ? part.text : ''
+// Not reported
+'text' in part ? part.text : ''
+```
+
+### `typescript/no-invalid-void-type`
+
+- Seen in: oxlint 1.85.0 and neverthrow 8.2.0. The rule is native to oxlint and
+  does not use tsgolint.
+- Report: the rule reports `void` as a type argument of a call, for example
+  `ok<void, E>(undefined)` and `okAsync<void, E>(undefined)`. The option
+  `allowInGenericTypeArguments` does not cover the type arguments of a call.
+- typescript-eslint 8.64.0: reports the same code.
+- Workaround: call `ok()` or `okAsync()` with no argument. neverthrow 8.2.0 has an
+  overload that returns `Ok<void, E>` or `ResultAsync<void, E>`. A binding that
+  needs the error type keeps `void` in its annotation. A type reference with
+  `void` is not reported.
+
+```ts
+// Reported
+const done = okAsync<void, PluginError>(undefined)
+// Not reported
+const done: ResultAsync<void, PluginError> = okAsync()
+```
+
+### `typescript/only-throw-error`
+
+- Seen in: oxlint 1.85.0 with oxlint-tsgolint 7.0.2003.
+- Report: the rule reports `throw await failStep()` when `failStep` returns
+  `Promise<never>`. It also reports the throw of a value whose type is a plain
+  object, for example a union of declared error shapes.
+- typescript-eslint 8.64.0: reports the same code.
+- Workaround for `Promise<never>`: write `return await failStep()` in place of
+  the throw. The call never returns, thus the `return` does not run.
+- Workaround for a declared error type: name the type in the `allow` option, in
+  a block of the repository. The preset sets no options on this rule, thus the
+  block replaces nothing. The rule still reports a throw of other types.
+- Limit: a check can narrow a value of an allowed union to one member. The value
+  then has the type of that member, and the rule reports its throw. Name each
+  member type in `allow`, and declare each member as a named type.
+
+```ts
+{
+  files: ['src/**'],
+  rules: {
+    'typescript/only-throw-error': [
+      'error',
+      { allow: [{ from: 'file', name: 'ProviderError' }, { from: 'file', name: 'Refused' }, { from: 'file', name: 'Aborted' }] },
+    ],
+  },
+}
+```
+
+### The JSON output of oxlint
+
+- Seen in: oxlint 1.85.0 with `--format json`.
+- Unit: `span.offset` and `span.column` count UTF-8 bytes. `span.line` counts
+  lines from 1. A line with a multibyte character before the report gives a
+  byte column that is larger than the character column. For example, in
+  `const s = "───"; debugger`, the report of `debugger` has column 24 and offset
+  23 in a one-line file, but the character index is 17.
+- Effect: a tool that edits a JavaScript string by `span.offset` changes the
+  wrong text after a multibyte character.
+- Workaround: convert the byte offset to a character offset, or find the text on
+  the line that `span.line` names.
+
+```ts
+const index = Buffer.from(source, 'utf8').subarray(0, span.offset).toString('utf8').length
+```
 
 ## Release the npm packages
 
