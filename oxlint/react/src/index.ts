@@ -19,24 +19,60 @@ export type RestrictedClass = { pattern: string; message: string }
 
 // SAFETY: `require` of an ES module returns its namespace, and the type names
 // the namespace of the same package. The specifier type admits no other one.
-const loadReactDoctor = createRequire(import.meta.url) as (specifier: 'eslint-plugin-react-doctor') => typeof import('eslint-plugin-react-doctor')
+const requireReactDoctor = createRequire(import.meta.url) as (specifier: 'eslint-plugin-react-doctor') => typeof import('eslint-plugin-react-doctor')
+
+const REACT_VERSION = /^([1-9]\d*)(?:\.(0|[1-9]\d*))?(?:\.(0|[1-9]\d*))?$/
+
+// The first major of the version ladder that the React Doctor CLI emits.
+const FIRST_LADDER_MAJOR = 17
+
+// The CLI clamps its ladder at its LATEST_KNOWN_REACT_MAJOR. The clamp bounds the loop for a huge major.
+const LAST_LADDER_MAJOR = 30
 
 /**
- * The rules of React Doctor, with its TanStack Query rules on top. Three of
- * them repeat a rule of the native `react` plugin, which the React block
- * already runs, thus they stay off and a site reports once.
+ * The capabilities that the React Doctor CLI emits for a React version:
+ * `react:17` up to `react:<major>`, and `react:19.2` from React 19.2. A
+ * capability `react:<n>` means React `<n>` or later, and a gate matches the
+ * exact string.
+ */
+function reactCapabilities(reactVersion: string): string[] {
+  const match = REACT_VERSION.exec(reactVersion)
+  if (!match) {
+    throw new Error(`reactDoctor.reactVersion must be a React version such as '19.3', and '${reactVersion}' is not one.`)
+  }
+  const [, majorText = '', minorText = '0'] = match
+  const major = Number(majorText)
+  const capabilities = ['react-compiler']
+  for (let n = FIRST_LADDER_MAJOR; n <= Math.min(major, LAST_LADDER_MAJOR); n++) capabilities.push(`react:${n}`)
+  if (major > 19 || (major === 19 && Number(minorText) >= 2)) capabilities.push('react:19.2')
+  return capabilities
+}
+
+/**
+ * The rules and the settings of React Doctor, with its TanStack Query rules on
+ * top. Three of the rules repeat a rule of the native `react` plugin, which the
+ * React block already runs, thus they stay off and a site reports once.
+ *
+ * The settings come from the same configs as the rules, thus a setting that a
+ * release of the plugin adds to them, for example `portedRuleMode`, reaches the
+ * root configuration as the rules do.
  *
  * The plugin is an optional peer, thus it loads only when a repository asks
  * for it. The factory is synchronous, and `require` loads the ES module of the
  * plugin synchronously.
  */
-function reactDoctorRules(): Record<string, 'error' | 'warn' | 'off'> {
-  const { default: reactDoctorPlugin } = loadReactDoctor('eslint-plugin-react-doctor')
+function loadReactDoctor(reactVersion: string): { rules: Record<string, 'error' | 'warn' | 'off'>; settings: Record<string, unknown> } {
+  const capabilities = reactCapabilities(reactVersion)
+  const { default: reactDoctorPlugin } = requireReactDoctor('eslint-plugin-react-doctor')
+  const configs = [reactDoctorPlugin.configs.recommended, reactDoctorPlugin.configs['tanstack-query']]
   return {
-    ...Object.fromEntries([reactDoctorPlugin.configs.recommended, reactDoctorPlugin.configs['tanstack-query']].flat().flatMap((config) => Object.entries(config.rules))),
-    'react-doctor/rules-of-hooks': 'off',
-    'react-doctor/exhaustive-deps': 'off',
-    'react-doctor/only-export-components': 'off',
+    rules: {
+      ...Object.fromEntries(configs.flatMap((config) => Object.entries(config.rules))),
+      'react-doctor/rules-of-hooks': 'off',
+      'react-doctor/exhaustive-deps': 'off',
+      'react-doctor/only-export-components': 'off',
+    },
+    settings: { ...Object.fromEntries(configs.flatMap((config) => Object.entries(config.settings['react-doctor']))), capabilities },
   }
 }
 
@@ -87,14 +123,22 @@ export type ReactOptions = TypescriptOptions & {
    * component, so the rules that ask for a manual `useMemo` stay off, through
    * the `react-compiler` capability that this option declares.
    *
-   * `true` applies the rules to each TypeScript file. A repository that names
-   * its own globs hands them over as `files`, for example the source of its
-   * apps and packages, with its extensions left out.
+   * `reactVersion` is the React version of the repository, for example
+   * `'19.3'`. Its version capabilities, `react:17` up to `react:<major>` and
+   * `react:19.2` from React 19.2, turn off the rules that exist for an older
+   * React. The plugin does not read the `requires` list of a rule in oxlint,
+   * thus a rule for a newer React still runs on an older React. A static
+   * configuration has no other source of the version, thus the option is
+   * required.
+   *
+   * The rules apply to each TypeScript file. A repository that names its own
+   * globs hands them over as `files`, for example the source of its apps and
+   * packages, with its extensions left out.
    *
    * The plugin is an optional peer: a repository that sets this option
    * installs `eslint-plugin-react-doctor` itself.
    */
-  reactDoctor?: true | { files: string[] }
+  reactDoctor?: { reactVersion: string; files?: string[] }
 }
 
 /**
@@ -148,8 +192,10 @@ export function react({ tailwind, reactDoctor, overrides = [], env, ...options }
   if (reactDoctor) jsPlugins.push(pluginPath('eslint-plugin-react-doctor'))
   if (tailwind) jsPlugins.push(pluginPath('eslint-plugin-better-tailwindcss'))
 
+  const reactDoctorConfig = reactDoctor ? loadReactDoctor(reactDoctor.reactVersion) : undefined
+
   const settings: NonNullable<OxlintConfig['settings']> = { ...base.settings }
-  if (reactDoctor) settings['react-doctor'] = { capabilities: ['react-compiler'] }
+  if (reactDoctorConfig) settings['react-doctor'] = reactDoctorConfig.settings
   if (tailwind) settings['better-tailwindcss'] = { entryPoint: tailwind.entryPoint }
 
   const tailwindRules: NonNullable<OxlintOverride['rules']> = { 'better-tailwindcss/enforce-canonical-classes': 'error' }
@@ -189,7 +235,7 @@ export function react({ tailwind, reactDoctor, overrides = [], env, ...options }
           'react/only-export-components': ['error', { allowConstantExport: true }],
         },
       },
-      ...(reactDoctor ? [{ files: reactDoctor === true ? ['**/*.{ts,tsx}'] : reactDoctor.files, rules: reactDoctorRules() } satisfies OxlintOverride] : []),
+      ...(reactDoctor && reactDoctorConfig ? [{ files: reactDoctor.files ?? ['**/*.{ts,tsx}'], rules: reactDoctorConfig.rules } satisfies OxlintOverride] : []),
       ...(tailwind ? [{ files: ['**/*.{ts,tsx}'], rules: tailwindRules } satisfies OxlintOverride] : []),
       ...overrides,
     ],

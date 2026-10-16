@@ -1,9 +1,10 @@
 import type { ESTree, Rule } from '@oxlint/plugins'
-// A statement is where the reason for an assertion reads: a person writes the
-// invariant above the line, not squeezed inside the expression. The walk up
-// from an assertion stops at the nearest of these, and a `SAFETY:` comment
-// anywhere between there and the assertion answers for it.
-const STATEMENTS = new Set(['ExpressionStatement', 'PropertyDefinition', 'ReturnStatement', 'ThrowStatement', 'VariableDeclaration'])
+// A statement that a block or the program holds is where the reason for an
+// assertion reads: a person writes the invariant above that line, not squeezed
+// inside the expression. A statement in a body without braces is the child of
+// its `if` or loop, so the walk goes on to the `if` or the loop, which the
+// block holds.
+const HOLDERS = new Set(['Program', 'BlockStatement', 'StaticBlock', 'SwitchCase', 'TSModuleBlock', 'ClassBody'])
 
 const SAFETY = /\bSAFETY\s*:/
 
@@ -22,13 +23,17 @@ function isConstAssertion(node: ESTree.TSAsExpression | ESTree.TSTypeAssertion):
  * above, a backend contract the program owns, a value the runtime built.
  *
  * That reason is invisible to the next reader, so this rule asks for it in a
- * `SAFETY:` comment on the assertion or the statement that holds it. The one in
- * `create-api-client.ts` states the trust boundary; there is no other in the
- * repository, and there is meant to be none without the invariant beside it.
+ * `SAFETY:` comment before the assertion on its line, or above the statement
+ * that holds it. A statement in a body without braces belongs to its `if` or
+ * loop. The one in `create-api-client.ts` states the trust boundary; there is
+ * no other in the repository, and there is meant to be none without the
+ * invariant beside it.
  *
  * `as const` is left alone: it freezes a literal and widens nothing, so it
  * carries no claim to justify. The comment is asked for once per statement,
- * where a person reads it, rather than crowded against the operator.
+ * where a person reads it, rather than crowded against the operator. A comment
+ * above an `if` or a loop does not reach the statements of its block, and a
+ * comment above a function does not reach a cast in an `if` test.
  */
 export const requireAssertionSafety: Rule = {
   meta: {
@@ -40,19 +45,18 @@ export const requireAssertionSafety: Rule = {
     schema: [],
     messages: {
       missingSafety:
-        'This `as` tells the compiler to stop checking, and nothing here says why that is sound. State the invariant in a `SAFETY:` comment on this line or the statement that holds it: the check that narrows the value, the contract that guarantees its shape, or the reason the runtime built it. If the value comes from outside the program, parse it with a zod schema instead.',
+        'This `as` tells the compiler to stop checking, and nothing here says why that is sound. State the invariant in a `SAFETY:` comment above the statement that holds the `as`, or before the `as` on its line: the check that narrows the value, the contract that guarantees its shape, or the reason the runtime built it. A statement in a body without braces belongs to its `if` or loop. If the value comes from outside the program, parse it with a zod schema instead.',
     },
   },
   create(context) {
     const { sourceCode } = context
 
-    /** Whether a `SAFETY:` comment sits before the assertion, up to the statement that owns it. */
+    /** Whether a `SAFETY:` comment sits before the assertion, up to the statement that a block or the program holds. */
     function hasSafety(node: ESTree.Node): boolean {
-      for (let current: ESTree.Node | null = node; current !== null; current = current.parent) {
+      for (let current = node; ; current = current.parent) {
         if (sourceCode.getCommentsBefore(current).some((comment) => comment.range[1] <= node.range[0] && SAFETY.test(comment.value))) return true
-        if (STATEMENTS.has(current.type) || current.parent?.type === 'Program') return false
+        if (current.parent === null || HOLDERS.has(current.parent.type)) return false
       }
-      return false
     }
 
     function check(node: ESTree.TSAsExpression | ESTree.TSTypeAssertion): void {
