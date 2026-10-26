@@ -3,8 +3,10 @@ import type { ESTree, Rule } from '@oxlint/plugins'
 
 type FunctionNode = ESTree.ArrowFunctionExpression | ESTree.Function
 
-const SUBSCRIPTION_MEMBERS = new Set(['on', 'addEventListener', 'setInterval'])
-const SUBSCRIPTION_GLOBALS = new Set(['addEventListener', 'setInterval'])
+// No timer: the timers ban of typescript() reports each one with its own fix,
+// and a second report here would ask for an `onCleanup` that the ban rejects.
+const SUBSCRIPTION_MEMBERS = new Set(['on', 'addEventListener'])
+const SUBSCRIPTION_GLOBALS = new Set(['addEventListener'])
 
 function nearestFunction(node: ESTree.Node): FunctionNode | undefined {
   for (let current = node.parent; current; current = current.parent) {
@@ -40,7 +42,7 @@ function isComponent(node: FunctionNode): boolean {
 
 /**
  * A subscription in the body of a component lives as long as the program, not
- * as long as the component: nothing ends a listener or a timer when Solid
+ * as long as the component: nothing ends a listener when Solid
  * disposes of the owner of the component. `onCleanup` in the same body is what
  * ends it.
  *

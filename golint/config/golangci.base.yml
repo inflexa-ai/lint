@@ -79,7 +79,7 @@ linters:
         - pattern: ^context\.(Background|TODO)$
           msg: take the context from the caller; detach with context.WithoutCancel
         - pattern: ^http\.(Get|Post|PostForm|Head|DefaultClient)$
-          msg: use an http.Client with a timeout and a request built with NewRequestWithContext
+          msg: use the HTTP client of the approved client package, and build the request with NewRequestWithContext
         - pattern: ^time\.Sleep$
           msg: wait with a select on ctx.Done() and a timer
     gocritic:

@@ -49,26 +49,54 @@ function readsOf(scope: Scope, name: string): Reference[] {
   return variable?.references.filter((reference) => reference.isRead()) ?? []
 }
 
+/** The wrappers that keep the value they hold. */
+const TRANSPARENT = new Set(['ParenthesizedExpression', 'TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'TSTypeAssertion'])
+
+function isAbortSignalAny(node: ESTree.Node): boolean {
+  if (node.type !== 'CallExpression') return false
+  const callee = node.callee
+  return callee.type === 'MemberExpression' && callee.object.type === 'Identifier' && callee.object.name === 'AbortSignal' && keyName(callee.property, callee.computed) === 'any'
+}
+
 /**
- * Whether the query function reads the `signal` its first argument carries.
+ * Whether the signal goes on from where it is read: into an argument of a
+ * call, into the value of a property of an object literal, or into the list
+ * that `AbortSignal.any` combines. A `void signal` or a bare `signal;` reads
+ * the signal and gives it to nothing, thus nothing can abort the request.
+ */
+function passesOn(read: ESTree.Node): boolean {
+  let value = read
+  let parent = value.parent
+  while (parent !== null && TRANSPARENT.has(parent.type)) {
+    value = parent
+    parent = parent.parent
+  }
+  if (parent === null) return false
+  if (parent.type === 'CallExpression' || parent.type === 'NewExpression') return parent.arguments.some((argument) => argument === value)
+  if (parent.type === 'Property') return parent.value === value && parent.parent.type === 'ObjectExpression'
+  return parent.type === 'ArrayExpression' && isAbortSignalAny(parent.parent)
+}
+
+/**
+ * Whether the query function passes on the `signal` its first argument carries.
  *
- * Both halves ask the same question of the scope: is the signal read. A
- * destructured `signal` that the body never mentions again has taken the signal
- * out of the context and dropped it, which leaves the request as uncancellable
- * as one that never asked for it. Counting the pattern instead of the reads
- * would call that function correct.
+ * Both halves ask the same question of the scope: does a read pass the signal
+ * on. A destructured `signal` that the body never mentions again has taken the
+ * signal out of the context and dropped it, which leaves the request as
+ * uncancellable as one that never asked for it. Counting the pattern instead of
+ * the reads would call that function correct.
  */
 function readsSignal(parameter: ESTree.ParamPattern, scope: Scope): boolean {
   if (parameter.type === 'ObjectPattern') {
     const property = propertyFor(parameter, 'signal')
     const local = property === undefined ? undefined : boundName(property)
-    return local !== undefined && readsOf(scope, local).length > 0
+    return local !== undefined && readsOf(scope, local).some((reference) => passesOn(reference.identifier))
   }
   if (parameter.type !== 'Identifier') return false
 
   return readsOf(scope, parameter.name).some((reference) => {
     const parent = reference.identifier.parent
-    return parent.type === 'MemberExpression' && keyName(parent.property, parent.computed) === 'signal'
+    return parent.type === 'MemberExpression' && parent.object === reference.identifier && keyName(parent.property, parent.computed) === 'signal' && passesOn(parent)
   })
 }
 

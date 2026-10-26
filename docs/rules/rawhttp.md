@@ -8,15 +8,21 @@ When each package builds its own `http.Client`, each client has its own timeouts
 
 ## What the rule reports
 
-- A composite literal of type `net/http.Client`, for example `&http.Client{Timeout: t}`, in a package whose import path starts with no entry of `client-packages`.
-- A call of `json.NewDecoder` or `io.ReadAll` whose argument is the `Body` field of a `*http.Request`. The rule reports it in a package whose import path starts with no entry of `body-packages`.
+- A value of type `net/http.Client` that a package makes, when its import path starts with no entry of `client-packages`. The rule reads these forms:
+  - a composite literal, for example `&http.Client{Timeout: t}`
+  - a call of `new(http.Client)`
+  - a declaration with no value, for example `var c http.Client`
+- A use of the `Body` field of an `http.Request` that can read the body, in a package whose import path starts with no entry of `body-packages`. Examples are `io.ReadAll(r.Body)`, `io.LimitReader(r.Body, n)`, `io.Copy(dst, r.Body)`, `body := r.Body` and `r.Body.Read(buf)`.
 
 forbidigo reports `http.Get`, `http.Post`, `http.PostForm`, `http.Head` and `http.DefaultClient`. Thus no line gets two reports.
 
 ## What the rule leaves alone
 
 - The same code inside an approved package.
-- A read of `resp.Body` from an `*http.Response`.
+- A `*http.Client` that the code does not make, for example a parameter, a field or `var c *http.Client`.
+- A struct type with a field of type `http.Client`, and a literal of that struct type.
+- A use of the request body that does not read it: an assignment to `r.Body`, `r.Body.Close()`, a test of `r.Body` against `nil`, and the argument of `http.MaxBytesReader`.
+- A read of `resp.Body` from an `*http.Response`. The client package reads the response, and the rule does not limit the packages that read it.
 
 The base configuration skips test files.
 

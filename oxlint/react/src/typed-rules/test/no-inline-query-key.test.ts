@@ -36,6 +36,12 @@ createRuleTester().run('@inflexa-ai/react/no-inline-query-key', noInlineQueryKey
     typed(`void queryClient.invalidateQueries({ ...filters, exact: true })`),
     typed(`queryClient.setQueryData(billingQueries.usage(orgId).queryKey, undefined)`),
     typed(`const queryKey = billingQueries.all(orgId)\nvoid queryClient.invalidateQueries({ queryKey })`),
+    typed(`const kept = { queryKey: billingQueries.all(orgId) }\nvoid queryClient.invalidateQueries(kept)`),
+    typed(`void queryClient.invalidateQueries(...[{ queryKey: billingQueries.all(orgId) }] as const)`),
+    // A variable that a later statement can change is not a copy of a key written at one place.
+    typed(`let changing = ['billing', orgId]\nvoid queryClient.invalidateQueries({ queryKey: changing })`),
+    // A spread of an array that this file does not write stands for unknown arguments.
+    typed(`declare const rest: [{ queryKey: readonly ['billing', string] }]\nvoid queryClient.invalidateQueries(...rest)`),
     // A call with no key at all: the filter that drops the whole cache, and one
     // that matches on something else.
     typed(`void queryClient.invalidateQueries()`),
@@ -98,6 +104,15 @@ createRuleTester().run('@inflexa-ai/react/no-inline-query-key', noInlineQueryKey
     reported(`void queryClient?.invalidateQueries({ queryKey: ['billing', orgId] })`),
     reported(`void (queryClient.invalidateQueries)({ queryKey: ['billing', orgId] })`),
     reported(`const invalidate = queryClient.invalidateQueries\nvoid invalidate({ queryKey: ['billing', orgId] })`),
+    // A key in a local `const`, which is the same copy one statement away.
+    reported(`const inline = ['billing', orgId] as const\nvoid queryClient.invalidateQueries({ queryKey: inline })`),
+    reported(`const queryKey = ['billing', orgId]\nvoid queryClient.invalidateQueries({ queryKey })`),
+    reported(`const kept = { queryKey: ['billing', orgId] }\nvoid queryClient.invalidateQueries(kept)`),
+    reported(`const inline = ['billing', orgId]\nvoid queryClient.getQueryData(inline)`),
+    // A spread of an array literal is its elements, in their positions.
+    reported(`void queryClient.invalidateQueries(...[{ queryKey: ['billing', orgId] }] as const)`),
+    reported(`void queryClient.getQueryData(...[['billing', orgId]] as const)`),
+    reported(`const args = [{ queryKey: ['billing', orgId] }] as const\nvoid queryClient.invalidateQueries(...args)`),
     // Written into an object that a spread also contributed to.
     reported(`void queryClient.invalidateQueries({ ...filters, queryKey: ['billing', orgId] })`),
     // A bound receiver is no indirection, so the key at the later call is read

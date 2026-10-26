@@ -12,8 +12,11 @@ Give the test the dependency as a value instead. A hook takes it as an argument.
 
 - `vi.mock`, `vi.doMock` and `vi.unstable_mockModule`, and the same methods on `jest`.
 - `mock.module` of `bun:test`.
+- `vi.spyOn(namespace, 'name')` and `jest.spyOn(namespace, 'name')`, where `namespace` is a namespace import, as in `import * as db from '../db'`. The spy swaps an export of the module under the code.
+- `vi.stubGlobal`, and a spy on `globalThis`, `window`, `self` or `global`. These swap a global under the code. Pass the clock, the HTTP client or the storage in through an options object.
 - The rule reads `vi['mock']` as the same call as `vi.mock`.
 
 ## What the rule leaves alone
 
+- A spy on an object that the test makes, or on a named import, as in `vi.spyOn(store, 'save')`.
 - A binding of one's own that is called `vi` or `mock`. The rule knows the framework object by what it denotes: `vi`, `jest` and `mock` from the test globals, and the same names imported from `vitest`, `@jest/globals` and `bun:test`. The import can use any local name, or a namespace import such as `import * as v from 'vitest'` with `v.vi`.

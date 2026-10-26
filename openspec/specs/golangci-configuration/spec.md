@@ -26,7 +26,12 @@ The base configuration of `golint` SHALL be a golangci-lint v2 file with `linter
 
 ### Requirement: The base configuration holds the generic dependency rule and ruleguard patterns
 
-The base configuration SHALL hold one depguard rule, with `list-mode: lax`, that denies `github.com/golang/mock`, `go.uber.org/mock`, `github.com/vektra/mockery` and `github.com/stretchr/testify/mock` in each file. It SHALL enable the `ruleguard` check of gocritic beside the default checks, with `failOn: dsl,import` and the rules file that the generator writes. The rules file SHALL hold `//go:build ruleguard` before its package clause and SHALL hold the rule for `decimal.NewFromFloat($x + $y)`. The layer rules of a repository, and its own ruleguard patterns in a second rules file, belong to its overlay.
+The base configuration SHALL hold one depguard rule, with `list-mode: lax`, that denies `github.com/golang/mock`, `go.uber.org/mock`, `github.com/vektra/mockery` and `github.com/stretchr/testify/mock` in each file. It SHALL enable the `ruleguard` check of gocritic beside the default checks, with `failOn: dsl,import` and the rules file that the generator writes. The rules file SHALL hold `//go:build ruleguard` before its package clause and SHALL hold the rule for `decimal.NewFromFloat($x + $y)` and the rule for an empty `default:` clause. The empty-default rule SHALL report a `switch` whose tag has a named type with an integer or string underlying type, when its last clause is a `default:` with no statement or with only `break`. This rule keeps exhaustive `default-signifies-exhaustive: true` from accepting a `default:` that does nothing. The layer rules of a repository, and its own ruleguard patterns in a second rules file, belong to its overlay.
+
+#### Scenario: An empty default in an enum switch
+
+- **WHEN** the generated configuration lints a `switch` on a value of `type State int` whose last clause is `default:` with no statement
+- **THEN** gocritic ruleguard reports the switch, and a `switch` on the same type whose `default:` returns an error gets no report
 
 #### Scenario: A generated mock
 

@@ -10,8 +10,14 @@ Data of unknown type enters the program at a boundary: a response, a message, st
 
 ## What the rule reports
 
-- A type predicate, `value is T`, on a function whose parameter is `unknown`, `any` or untyped.
+- A type predicate, `value is T`, or an assertion, `asserts value is T`, on a function whose parameter admits a value of any shape:
+  - `unknown` or `any`
+  - `object` or the empty object type `{}`
+  - a `Record` whose value is one of these
+  - a union that contains one of these
+  - no type annotation
 
 ## What the rule leaves alone
 
-- A guard that narrows a known union, for example `part is ToolCall` out of `ChatPart`. It states a fact about types that the program already has.
+- A callback with no type annotation that is an argument of a call, as in `parts.filter((part): part is Foo => …)`. The call gives the parameter its type.
+- A guard that narrows a known type, for example `part is ToolCall` out of `ChatPart`. `require-assertion-safety` reports it, because TypeScript does not compare the predicate with the body. The two rules never report the same guard.

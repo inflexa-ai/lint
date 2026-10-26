@@ -9,5 +9,6 @@ import (
 )
 
 func TestAnalyzer(t *testing.T) {
-	analysistest.Run(t, analysistest.TestData(), anyapi.Analyzer, "a", "local/b", "local/c")
+	a := anyapi.New(anyapi.Settings{AllowTypes: []string{"a.Document"}})
+	analysistest.Run(t, analysistest.TestData(), a, "a", "local/b", "local/c")
 }

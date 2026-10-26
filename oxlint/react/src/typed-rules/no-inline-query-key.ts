@@ -7,13 +7,18 @@ import {
   isAsExpression,
   isCallExpression,
   isClassDeclaration,
+  isIdentifier,
   isNonNullExpression,
   isParenthesizedExpression,
   isPropertyAssignment,
   isSatisfiesExpression,
+  isShorthandPropertyAssignment,
   isSpreadElement,
   isTypeAssertion,
+  isVariableDeclaration,
+  isVariableDeclarationList,
   type Node,
+  NodeFlags,
   SyntaxKind,
 } from '@inflexa-ai/typecheck/unstable/ast'
 import { type Signature, SignatureKind, type Symbol as TypeSymbol } from '@inflexa-ai/typecheck/unstable/sync'
@@ -75,8 +80,11 @@ function sameNode(a: Node, b: Node): boolean {
  * method pulled into a variable of its own, and would report an unrelated
  * object's `invalidateQueries`.
  *
- * Only an array literal is reported. A factory call, a variable and an entry's
- * `.queryKey` each have one owner, which is the arrangement this protects.
+ * Only an array literal is reported, written at the call or as the initializer
+ * of a `const` of the same file that the call reads. A factory call, a
+ * parameter, a `let` and an entry's `.queryKey` each have one owner, which is
+ * the arrangement this protects. A spread of an array literal is read as its
+ * elements, in their positions.
  *
  * A method reached reflectively hides the key behind an argument list, where an
  * inline key and a key from a factory look the same. `indirectionOf` decides
@@ -93,11 +101,49 @@ export const noInlineQueryKey: RuleModule = {
       indirectCall:
         'This call goes through `{{through}}`, where the arguments cannot be read, so nothing here can tell whether the key came from a factory or was written out at the call. Call the method directly, `queryClient.invalidateQueries({ queryKey: todoQueries.all() })`: app code has no need for the indirection, and reaching for it is how a second copy of a key gets past this rule.',
       inlineQueryKey:
-        'This key is written out at the call, which makes a second copy of a key that the query key factory of the resource already owns. The day that factory changes its key, this call matches nothing and no test fails, because a filter that matches no entry is not a failure. Take the key from the factory: an entry\'s own `.queryKey` for one query, `todoQueries.detail(id).queryKey`, and the key-only `all` entry for the prefix that covers the resource, `todoQueries.all()`. A literal that spreads a factory call and adds elements after it, `[...todoQueries.all(), "done"]`, is the same copy: the elements after the spread are the half that drifts. A prefix no entry yields yet is an entry that the factory gains.',
+        'This key is written out at the call, or in a local `const` that the call reads, which makes a second copy of a key that the query key factory of the resource already owns. The day that factory changes its key, this call matches nothing and no test fails, because a filter that matches no entry is not a failure. Take the key from the factory: an entry\'s own `.queryKey` for one query, `todoQueries.detail(id).queryKey`, and the key-only `all` entry for the prefix that covers the resource, `todoQueries.all()`. A literal that spreads a factory call and adds elements after it, `[...todoQueries.all(), "done"]`, is the same copy: the elements after the spread are the half that drifts. A prefix no entry yields yet is an entry that the factory gains.',
     },
   },
   create(context) {
-    const { checker } = context
+    const { checker, sourceFile } = context
+
+    /** The initializer of the `const` of this file that the symbol names, without its assertions. */
+    function constInitializerOf(symbol: TypeSymbol | undefined): Expression | undefined {
+      const declaration = (symbol?.valueDeclaration ?? symbol?.declarations[0])?.resolve()
+      if (declaration === undefined || !isVariableDeclaration(declaration) || declaration.initializer === undefined) return undefined
+      if (declaration.getSourceFile().fileName !== sourceFile.fileName) return undefined
+      const list = declaration.parent
+      if (!isVariableDeclarationList(list) || (list.flags & NodeFlags.Const) === 0) return undefined
+      return withoutAssertions(declaration.initializer)
+    }
+
+    /** The value without its assertions, or the initializer of the local `const` that it names. */
+    function localValueOf(node: Expression): Expression {
+      const value = withoutAssertions(node)
+      if (!isIdentifier(value)) return value
+      return constInitializerOf(checker.getSymbolAtLocation(value)) ?? value
+    }
+
+    /**
+     * The arguments in their positions, where a spread of an array literal
+     * gives its elements. A spread of any other value stands for an unknown
+     * number of values, thus the list ends before it.
+     */
+    function positionalArguments(args: readonly Expression[]): Expression[] {
+      const positional: Expression[] = []
+      for (const argument of args) {
+        if (!isSpreadElement(argument)) {
+          positional.push(argument)
+          continue
+        }
+        const spread = localValueOf(argument.expression)
+        if (!isArrayLiteralExpression(spread)) break
+        const elements = positionalArguments(spread.elements)
+        positional.push(...elements)
+        if (elements.length < spread.elements.length) break
+      }
+      return positional
+    }
 
     /**
      * Whether the method this call resolved to is declared on the cache or on
@@ -126,16 +172,17 @@ export const noInlineQueryKey: RuleModule = {
       const declared = parameterType === undefined ? undefined : checker.getNonNullableType(parameterType)
       if (declared === undefined || checker.getPropertyOfType(declared, 'queryKey') === undefined) return undefined
 
-      const object = withoutAssertions(argument)
+      const object = localValueOf(argument)
       const objectType = checker.getTypeAtLocation(object)
       const written = objectType === undefined ? undefined : checker.getPropertyOfType(objectType, 'queryKey')?.valueDeclaration?.resolve()
       // The property has to belong to this argument's own literal. Reached
       // through a spread, `{ ...filters }`, it is declared in another object and
       // possibly another file, and that object is where a reader would have to
-      // be sent instead. A shorthand property fails the same check and is a
-      // variable anyway.
-      if (written === undefined || !isPropertyAssignment(written) || !sameNode(written.parent, object)) return undefined
-      return withoutAssertions(written.initializer)
+      // be sent instead.
+      if (written === undefined || !sameNode(written.parent, object)) return undefined
+      if (isPropertyAssignment(written)) return localValueOf(written.initializer)
+      if (isShorthandPropertyAssignment(written)) return constInitializerOf(checker.getShorthandAssignmentValueSymbol(written))
+      return undefined
     }
 
     /**
@@ -148,20 +195,16 @@ export const noInlineQueryKey: RuleModule = {
      * change here.
      */
     function keyOf(call: CallExpression, signature: Signature): Expression | undefined {
-      const args = call.arguments
-      // A spread argument stands for an unknown number of values, thus no
-      // position after it is the parameter the signature says it is.
-      const spreadAt = args.findIndex((argument) => isSpreadElement(argument))
-      const limit = spreadAt === -1 ? args.length : spreadAt
+      const args = positionalArguments(call.arguments)
 
       for (const [at, parameter] of signature.getParameters().entries()) {
         const argument = args.at(at)
-        if (at >= limit || argument === undefined) return undefined
+        if (argument === undefined) return undefined
 
         // The name is the library's own, declared in its types, and not a
         // convention at the call. Reading the type instead would report
         // `setQueryData(key, ['a', 'b'])`, whose second argument is the data.
-        if (parameter.name === 'queryKey') return withoutAssertions(argument)
+        if (parameter.name === 'queryKey') return localValueOf(argument)
 
         const carried = carriedKeyOf(parameter, argument)
         if (carried !== undefined) return carried

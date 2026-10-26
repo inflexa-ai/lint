@@ -1,7 +1,5 @@
-import type { ESTree, Rule } from '@oxlint/plugins'
-
-/** The functions that can carry a type guard. */
-type GuardFunction = ESTree.Function | ESTree.ArrowFunctionExpression
+import type { Rule } from '@oxlint/plugins'
+import { type GuardFunction, guardKind } from '../helpers/type-guards.ts'
 
 // The selectors of the nodes of `GuardFunction`.
 const FUNCTIONS = ['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression', 'TSDeclareFunction', 'TSEmptyBodyFunctionExpression']
@@ -25,9 +23,11 @@ function functionName(node: GuardFunction): string {
  * the source of the type; everything inward receives typed data and has
  * nothing left to guard.
  *
- * Only guards over `unknown`, `any` or an untyped parameter are reported. A
- * guard that narrows a known union (`part is ToolCall` out of `ChatPart`) states
- * a fact about types the program already has, and is left alone.
+ * Only guards over a type of any shape are reported: `unknown`, `any`,
+ * `object`, `{}`, a `Record` of one of these, and a parameter with no type. A
+ * callback that is a call argument takes the type of its parameter from the
+ * call, so it is not untyped. A guard that narrows a known union (`part is
+ * ToolCall` out of `ChatPart`) is the concern of `require-assertion-safety`.
  */
 export const noUnknownTypeGuards: Rule = {
   meta: {
@@ -39,22 +39,13 @@ export const noUnknownTypeGuards: Rule = {
     schema: [],
     messages: {
       unknownGuard:
-        '`{{name}}` is a hand-written validator for untyped data: it checks what its author thought of, and nothing keeps it in step with the type it claims. Describe the shape once as a zod schema, parse where the data enters the program (`schema.parse` or `safeParse`), and pass the typed result inward; `z.infer` gives the type. A guard that narrows a known union is fine.',
+        '`{{name}}` is a hand-written validator for untyped data: it checks what its author thought of, and nothing keeps it in step with the type it claims. Describe the shape once as a zod schema, parse where the data enters the program (`schema.parse` or `safeParse`), and pass the typed result inward; `z.infer` gives the type. A wide type such as `object`, `{}` or `Record<string, unknown>` is the same untyped data.',
     },
   },
   create(context) {
     function check(node: GuardFunction): void {
-      const { returnType } = node
-      const predicate = returnType?.typeAnnotation
-      if (!returnType || predicate?.type !== 'TSTypePredicate' || predicate.parameterName.type !== 'Identifier') return
-
-      const { name } = predicate.parameterName
-      const parameter = node.params.filter((param) => param.type === 'Identifier').find((param) => param.name === name)
-      if (!parameter) return
-
-      const type = parameter.typeAnnotation?.typeAnnotation.type
-      if (type === undefined || type === 'TSUnknownKeyword' || type === 'TSAnyKeyword') {
-        context.report({ node: returnType, messageId: 'unknownGuard', data: { name: functionName(node) } })
+      if (node.returnType && guardKind(node) === 'untyped') {
+        context.report({ node: node.returnType, messageId: 'unknownGuard', data: { name: functionName(node) } })
       }
     }
 

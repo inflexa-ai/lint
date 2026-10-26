@@ -46,12 +46,12 @@ export const CONFIG_FILE = 'typecheck.config.ts'
 
 /**
  * The configuration of `inflexa-typecheck`. Its own block comes first and
- * turns on `no-generated-empty-object-type` for each TypeScript file, as the
- * former ESLint configuration did. Each other typed rule is on only where an
- * override of the repository turns it on.
+ * turns on `no-generated-empty-object-type`, as the former ESLint configuration
+ * did, and `no-lookup-in-loop` for each TypeScript file. Each other typed rule
+ * is on only where an override of the repository turns it on.
  */
 export function typecheck({ plugins = [], overrides = [] }: TypecheckOptions = {}): TypecheckConfig {
-  return new TypecheckConfig(plugins, [{ files: ['**/*.{ts,tsx}'], rules: { 'no-generated-empty-object-type': 'error' } }, ...overrides])
+  return new TypecheckConfig(plugins, [{ files: ['**/*.{ts,tsx}'], rules: { 'no-generated-empty-object-type': 'error', 'no-lookup-in-loop': 'error' } }, ...overrides])
 }
 
 /**

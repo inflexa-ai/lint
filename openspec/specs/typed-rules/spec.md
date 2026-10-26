@@ -8,7 +8,7 @@ The rules that read types run in `inflexa-typecheck` on the program of TypeScrip
 
 ### Requirement: inflexa-typecheck runs the typed rules
 
-`@inflexa-ai/typecheck` SHALL hold the typed rules `must-use-result`, `require-abort-signal` and `no-generated-empty-object-type`. The `./typecheck` entry of `@inflexa-ai/oxlint-plugin-react` SHALL export a typecheck plugin named `@inflexa-ai/react` with the rules `no-inline-query-key` and `no-void-query-fn`. `typecheck()` SHALL turn on `no-generated-empty-object-type` by default, and a repository SHALL turn on each other typed rule in its own overrides. No oxlint plugin of this repository SHALL hold a typed rule. No package of this repository SHALL have an `./eslint` entry or depend on `eslint`, `typescript-eslint` or a package of `@typescript-eslint/`. The React package SHALL name `@inflexa-ai/typecheck` at the shared version as an optional peer dependency, which only its `./typecheck` entry needs, and SHALL declare no `typescript` peer. The typed rules of the React package SHALL import the modules of TypeScript 7 only through `@inflexa-ai/typecheck`.
+`@inflexa-ai/typecheck` SHALL hold the typed rules `must-use-result`, `require-abort-signal`, `no-generated-empty-object-type` and `no-lookup-in-loop`. The `./typecheck` entry of `@inflexa-ai/oxlint-plugin-react` SHALL export a typecheck plugin named `@inflexa-ai/react` with the rules `no-inline-query-key` and `no-void-query-fn`. `typecheck()` SHALL turn on `no-generated-empty-object-type` and `no-lookup-in-loop` by default, and a repository SHALL turn on each other typed rule in its own overrides. No oxlint plugin of this repository SHALL hold a typed rule. No package of this repository SHALL have an `./eslint` entry or depend on `eslint`, `typescript-eslint` or a package of `@typescript-eslint/`. The React package SHALL name `@inflexa-ai/typecheck` at the shared version as an optional peer dependency, which only its `./typecheck` entry needs, and SHALL declare no `typescript` peer. The typed rules of the React package SHALL import the modules of TypeScript 7 only through `@inflexa-ai/typecheck`.
 
 #### Scenario: A repository runs a typed rule
 
@@ -29,7 +29,8 @@ The rules that read types run in `inflexa-typecheck` on the program of TypeScrip
 
 `must-use-result` SHALL look at each call, `new` and `await` expression whose type is a neverthrow `Result` or `ResultAsync`, and SHALL report it when the program does not use the value. A type is a `Result` when its apparent type, or a member of its union, has each of `mapErr`, `map`, `andThen`, `orElse`, `match` and `unwrapOr`. The rule SHALL treat a value as used when one of these holds, and SHALL report it in each other case:
 
-- A call of `match`, `unwrapOr`, `_unsafeUnwrap`, `_unsafeUnwrapErr`, `isOk` or `isErr` on it, directly or at the end of a chain of method calls on it.
+- A call of `match`, `unwrapOr`, `_unsafeUnwrap` or `_unsafeUnwrapErr` on it, directly or at the end of a chain of method calls on it.
+- A call of `isOk` or `isErr` on it, directly or at the end of a chain of method calls on it, when the call is not the expression of an expression statement.
 - A read of its property `error`, `value`, `isOk` or `isErr`.
 - An ancestor up to the nearest block or source file is a `return` statement or an arrow function, as `isReturned` of upstream decides. Thus `return cond ? ok(1) : err('e')` and `(x) => f(getResult())` use the value.
 - A `yield*` of it inside the generator function that `safeTry` receives.
@@ -38,7 +39,7 @@ The rules that read types run in `inflexa-typecheck` on the program of TypeScrip
 - The nearest variable declaration among its ancestors up to the nearest block has an identifier name and an initializer that is a `Result`, and a reference of that variable uses the value by one of the rules above, as `getAssignation` and `handleAssignation` of upstream decide.
 - The nearest assignment `name = <Result>` among its ancestors up to the nearest block, which the walk reaches from its right side, has an identifier on the left, and a reference of that variable uses the value by one of the rules above. Upstream follows only a declaration. The walk SHALL follow each variable once on its path, thus `r = r.map(f)` ends.
 
-The rule SHALL step through parentheses, `await`, `as`, `!` and `?.` between the value and its use. As upstream does, it SHALL leave out an expression whose parent is a type assertion (`as`, `satisfies`, `<T>`) or a non-null assertion, and an initializer of a class field. The rule SHALL report an unused value at the expression that gives it, also when a variable holds the value. The option `consumers` SHALL default to an empty list.
+The rule SHALL step through parentheses, `await`, `as`, `satisfies`, `!` and `?.` between the value and its use. As upstream does, it SHALL leave out an expression whose parent is a type assertion (`as`, `<T>`) or a non-null assertion, and an initializer of a class field. Unlike upstream, it SHALL examine an expression under `satisfies`, because `satisfies` does not change the value. The rule SHALL report an unused value at the expression that gives it, also when a variable holds the value. Its message SHALL name `match`, `unwrapOr`, and a branch on `isOk()` or `isErr()`, and SHALL NOT name `_unsafeUnwrap`. The option `consumers` SHALL default to an empty list.
 
 #### Scenario: A statement drops a Result
 
@@ -97,8 +98,18 @@ The rule SHALL step through parentheses, `await`, `as`, `!` and `?.` between the
 
 #### Scenario: The checks and the properties of inflexa
 
-- **WHEN** a file reads `result.isOk()`, `result.isErr()`, `result.error`, `result.value`, `result.isOk` or `result.isErr`
+- **WHEN** a file reads `if (result.isOk()) {}`, `const failed = result.isErr()`, `result.error`, `result.value`, `result.isOk` or `result.isErr`
 - **THEN** the rule treats `result` as used
+
+#### Scenario: A check whose answer no code reads
+
+- **WHEN** a statement is `getResult().isOk()`, or a file holds `const result = getResult(); result.isErr()`
+- **THEN** the rule reports `getResult()`
+
+#### Scenario: satisfies
+
+- **WHEN** a statement is `load() satisfies Result<number, Error>`
+- **THEN** the rule reports `load()`, and it reports nothing for `(load() satisfies Result<number, Error>).unwrapOr(0)`
 
 #### Scenario: A step through a wrapper
 
@@ -124,6 +135,18 @@ The rule SHALL step through parentheses, `await`, `as`, `!` and `?.` between the
 
 `require-abort-signal` and `no-inline-query-key` SHALL report the same calls, with the same message ids, data and options, as their ESLint versions reported. Each valid and each invalid case of their ESLint tests SHALL keep its result in the tests of the rule tester of `@inflexa-ai/typecheck`.
 
+`no-inline-query-key` SHALL also follow an identifier in a key position, or in a filters or options position, to its `const` declaration in the same file. It SHALL report the key when the initializer is an array literal, or an object literal whose own `queryKey` is an array literal. The rule SHALL read a spread of an array literal in the arguments as its elements, in their positions.
+
+#### Scenario: A key in a local const
+
+- **WHEN** a file holds `const key = ['todos']` and then `client.invalidateQueries({ queryKey: key })`, or `const filters = { queryKey: ['todos'] }` and then `client.invalidateQueries(filters)`
+- **THEN** the rule reports the array literal, and it reports nothing for `let key = ['todos']`
+
+#### Scenario: A spread of an array literal
+
+- **WHEN** a file holds `client.invalidateQueries(...[{ queryKey: ['todos'] }] as const)`
+- **THEN** the rule reports the array literal of the key
+
 #### Scenario: The former cases
 
 - **WHEN** the cases of the former ESLint tests of both rules run in the rule tester of `@inflexa-ai/typecheck`
@@ -146,6 +169,42 @@ The rule SHALL step through parentheses, `await`, `as`, `!` and `?.` between the
 #### Scenario: A mapped type that waits for its type argument
 
 - **WHEN** a generic declaration holds `Record<keyof T, unknown>`
+- **THEN** the rule reports nothing
+
+### Requirement: no-lookup-in-loop reports a scan of an array on each pass of a loop
+
+`no-lookup-in-loop` SHALL report a call of `includes`, `indexOf` or `lastIndexOf`, and a call of `find`, `findIndex`, `findLast`, `findLastIndex`, `some` or `filter` whose callback gives one `===` or `==` comparison, when the checker types the receiver as an array or a tuple, the receiver is an identifier, `this`, or a chain of property reads from one, and that root is declared outside of the nearest repeating context of the call. A repeating context SHALL be the body of a `for`, `for...of`, `for...in`, `while` or `do` statement, the condition of a `for`, `while` or `do` statement, the update of a `for` statement, or the callback of an array method that calls it for each element.
+
+The rule SHALL also report a `for...of` statement over an array or a tuple when its receiver obeys the same conditions, and its body, outside of a nested function, holds a `===` or `==` comparison. One side of that comparison SHALL be a name that the statement binds for each element, or a chain of property reads from that name. The other side SHALL not read such a name.
+
+#### Scenario: A search by hand inside a loop
+
+- **WHEN** a file holds `for (const row of rows) for (const s of selected) if (s === row.id) break` and `selected` is a `string[]` declared outside of the outer loop
+- **THEN** the rule reports the inner `for...of` statement
+
+#### Scenario: An inner loop with no equality to a value
+
+- **WHEN** a file holds `for (const row of rows) for (const user of users) if (user.name.startsWith(row.name)) break`, or `for (const row of rows) for (const tag of row.tags) if (tag === 'urgent') break`
+- **THEN** the rule reports nothing
+
+#### Scenario: A membership test inside a callback
+
+- **WHEN** a file holds `const kept = rows.filter((row) => selected.includes(row.id))` and `selected` is a `string[]` declared outside of the callback
+- **THEN** the rule reports `selected.includes(row.id)`
+
+#### Scenario: A keyed find inside a loop
+
+- **WHEN** a file holds `for (const row of rows) users.find((user) => user.id === row.userId)`
+- **THEN** the rule reports the call of `find`
+
+#### Scenario: A string method and an array of the element
+
+- **WHEN** a file holds `for (const row of rows) row.name.includes(name)` and `for (const row of rows) row.tags.includes('urgent')`
+- **THEN** the rule reports nothing
+
+#### Scenario: A predicate with no keyed form
+
+- **WHEN** a file holds `for (const row of rows) users.find((user) => user.name.startsWith(row.name))`
 - **THEN** the rule reports nothing
 
 ### Requirement: no-void-query-fn reports a query function that gives no value

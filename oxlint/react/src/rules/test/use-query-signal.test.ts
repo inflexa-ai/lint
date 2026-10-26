@@ -30,6 +30,10 @@ ruleTester.run('use-query-signal', useQuerySignal, {
     `useMutation({ mutationFn: (input) => api.post('/projects', input, { signal: AbortSignal.timeout(30_000) }) })`,
     `useQueries({ queries: paths.map((path) => ({ queryKey: [path], queryFn: ({ signal }) => api.get(path, { signal }) })) })`,
     `queryClient.query({ queryKey: ['p'], queryFn: ({ signal }) => api.get('/projects', { signal }) })`,
+    // The signal as an argument of a call, also through an assertion.
+    `useQuery({ queryKey: ['p'], queryFn: ({ signal }) => api.get('/p', signal) })`,
+    `useQuery({ queryKey: ['p'], queryFn: ({ signal }) => fetch(new Request('/p', { signal: signal as AbortSignal })) })`,
+    `useQuery({ queryKey: ['p'], queryFn: (context) => api.get('/p', context.signal) })`,
   ],
   invalid: [
     // A deadline of its own satisfies the other rule and cancels nothing on unmount.
@@ -62,6 +66,14 @@ ruleTester.run('use-query-signal', useQuerySignal, {
       code: `const options = { queryKey: ['p'], queryFn: () => api.get('/p', { signal: deadline }) }\nuseQuery(options)`,
       errors: ignored,
     },
+    // A read that passes the signal to nothing: `void` and a bare statement.
+    {
+      code: `queryOptions({ queryKey: ['todos'], queryFn: ({ signal }) => { void signal; return api.get('/todos', { signal: AbortSignal.timeout(5000) }) } })`,
+      errors: ignored,
+    },
+    { code: `useQuery({ queryKey: ['p'], queryFn: ({ signal }) => { signal; return api.get('/p') } })`, errors: ignored },
+    { code: `useQuery({ queryKey: ['p'], queryFn: (context) => { void context.signal; return api.get('/p') } })`, errors: ignored },
+    { code: `useQuery({ queryKey: ['p'], queryFn: (context) => { context.signal; return api.get('/p') } })`, errors: ignored },
     // Method shorthand and a function expression are written in place too.
     { code: `useQuery({ queryKey: ['p'], queryFn() { return api.get('/p') } })`, errors: ignored },
     { code: `useQuery({ queryKey: ['p'], queryFn: async function (context) { return api.get('/p') } })`, errors: ignored },

@@ -12,9 +12,14 @@ ruleTester.run('no-unknown-parameters', noUnknownParameters, {
   valid: [
     `function save(user: User) {}`,
     `const read = (id: OrgId) => load(id)`,
-    // An error cause is unknown by contract.
-    `function wrap(cause: unknown) {}`,
-    `class E extends Error { constructor(cause: unknown) { super() } }`,
+    // An error cause is unknown by contract, where the function passes it on to an error.
+    `function wrap(cause: unknown) { return new UploadError('upload failed', { cause }) }`,
+    `function wrap(cause: unknown) { throw new Error('failed', { cause: cause }) }`,
+    `class E extends Error { constructor(message: string, cause: unknown) { super(message, { cause }) } }`,
+    // A rejection callback receives whatever was thrown.
+    `p.catch((error: unknown) => log(error))`,
+    `p?.catch(function (reason: unknown) { log(reason) })`,
+    `p.then(use, (error: unknown) => log(error))`,
     // A generic parameter is not unknown.
     `function first<T>(value: T): T { return value }`,
     `function save(user: User, meta: RequestMeta) {}`,
@@ -30,6 +35,14 @@ ruleTester.run('no-unknown-parameters', noUnknownParameters, {
     { code: `function save(value: unknown = 1) {}`, errors: [unknownParameter('value')] },
     // A method signature in a type is a contract as much as a function is.
     { code: `type Store = { put(value: unknown): void }`, errors: [unknownParameter('value')] },
+    // The name `cause` alone is not an error option.
+    { code: `function render(cause: unknown) { return String(cause) }`, errors: [unknownParameter('cause')] },
+    { code: `class E extends Error { constructor(cause: unknown) { super() } }`, errors: [unknownParameter('cause')] },
+    { code: `function wrap(cause: unknown) { return { cause } }`, errors: [unknownParameter('cause')] },
+    { code: `declare function wrap(cause: unknown): Error`, errors: [unknownParameter('cause')] },
+    // Only the rejection callback of `.then` receives a thrown value.
+    { code: `p.then((value: unknown) => use(value))`, errors: [unknownParameter('value')] },
+    { code: `p.catch(log, (extra: unknown) => use(extra))`, errors: [unknownParameter('extra')] },
   ],
 })
 
@@ -88,9 +101,11 @@ ruleTester.run('no-unsafe-dictionary', noUnsafeDictionary, {
     `type Counts = { [name: string]: number }`,
     // A shadowed Record is not the builtin.
     `import { Record } from './schema'\ntype Users = Record<string, unknown>`,
-    // A Map is not an index dictionary.
-    `type Cache = Map<string, unknown>`,
+    `type Cache = Map<string, User>`,
     `type Flags = Record<string, boolean>`,
+    `type Tags = Record<string, string[]>`,
+    // A shadowed Map is not the builtin.
+    `import { Map } from './schema'\ntype Cache = Map<string, unknown>`,
   ],
   invalid: [
     { code: `type Bag = Record<string, unknown>`, errors: [unsafeDictionary('unknown')] },
@@ -107,5 +122,14 @@ ruleTester.run('no-unsafe-dictionary', noUnsafeDictionary, {
     { code: `type Bag = Readonly<Record<string, unknown>>`, errors: [unsafeDictionary('unknown')] },
     // A mapped type over a broad value is a dictionary too.
     { code: `type Bag = { [K in string]: any }`, errors: [unsafeDictionary('any')] },
+    // A Map is a dictionary with the value as its second type argument.
+    { code: `type Cache = Map<string, unknown>`, errors: [unsafeDictionary('unknown')] },
+    { code: `type Cache = ReadonlyMap<string, any>`, errors: [unsafeDictionary('any')] },
+    { code: `type Cache = WeakMap<object, object>`, errors: [unsafeDictionary('object')] },
+    // An array value carries the hole of its element.
+    { code: `type Bag = Record<string, unknown[]>`, errors: [unsafeDictionary('unknown[]')] },
+    { code: `type Bag = Record<string, Array<unknown>>`, errors: [unsafeDictionary('unknown[]')] },
+    { code: `type Bag = { [key: string]: readonly any[] }`, errors: [unsafeDictionary('any[]')] },
+    { code: `type Bag = Map<string, ReadonlyArray<unknown>>`, errors: [unsafeDictionary('unknown[]')] },
   ],
 })

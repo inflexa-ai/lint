@@ -22,7 +22,7 @@ The oxlint factories of the packages of the workspace give each repository of In
 
 ### Requirement: The rule set names each rule
 
-The factory SHALL turn off the `correctness` category and name each rule. The rule set SHALL be the set that the ESLint factories turned on, plus `typescript/explicit-function-return-type`, except `no-octal`, `react-hooks/config`, `react-hooks/gating`, the `allowCompoundComponents` option of `only-export-components`, the `errorClassNames` option of `preserve-caught-error`, and the typed rules of the `typed-rules` capability.
+The factory SHALL turn off the `correctness` category and name each rule. The rule set SHALL be the set that the ESLint factories turned on, plus `typescript/explicit-function-return-type` and the native performance rules, except `no-octal`, `react-hooks/config`, `react-hooks/gating`, the `allowCompoundComponents` option of `only-export-components`, the `errorClassNames` option of `preserve-caught-error`, and the typed rules of the `typed-rules` capability.
 
 #### Scenario: Only the named rules run
 
@@ -42,6 +42,11 @@ The configuration SHALL set `respectEslintDisableDirectives: false` and `reportU
 
 The factory SHALL register `oxlint-plugin-eslint` under the name `eslint-js`, and SHALL apply the syntax bans as `eslint-js/no-restricted-syntax`. Each ban message SHALL name that rule id in the directive that it tells a person to write.
 
+#### Scenario: A schema parses the result of JSON.parse
+
+- **WHEN** a file holds `Settings.parse(JSON.parse(text))`, `JSON.parse(text)` and `z.string().transform(JSON.parse)`
+- **THEN** the `jsonParse` ban reports the second and the third only
+
 #### Scenario: A syntax ban and its directive
 
 - **WHEN** a file calls `forEach`, and a second call carries `// oxlint-disable-next-line eslint-js/no-restricted-syntax -- <reason>`
@@ -55,6 +60,25 @@ The configuration SHALL ignore `node_modules/`, `dist/` and `coverage/` at each 
 
 - **WHEN** oxlint runs in a repository that has no `.gitignore`
 - **THEN** it lints no file under `node_modules/`
+
+### Requirement: The performance rules keep the fix immutable and bounded
+
+`typescript()` SHALL turn on `no-await-in-loop`, `oxc/no-accumulating-spread`, `unicorn/prefer-set-has`, `unicorn/prefer-array-find`, `unicorn/prefer-array-flat-map`, `no-useless-call`, `@inflexa-ai/no-unbounded-promise-all` and `@inflexa-ai/no-accumulating-copy` for each source file. It SHALL NOT turn on `oxc/no-map-spread`, whose fix mutates the element of a callback. It SHALL turn `no-await-in-loop` off for the globs of the `tests` option. The `queueHint` option SHALL set the `hint` of `no-unbounded-promise-all`.
+
+#### Scenario: A spread into the accumulator of reduce
+
+- **WHEN** oxlint lints `const byId = users.reduce((acc, user) => ({ ...acc, [user.id]: user }), {})` with the configuration of `typescript()`
+- **THEN** `oxc/no-accumulating-spread` reports the spread
+
+#### Scenario: The fix of an await in a loop is a queue of fixed width
+
+- **WHEN** oxlint lints `for (const id of ids) await load(id)` and `await Promise.all(ids.map(load))`
+- **THEN** `no-await-in-loop` reports the first, and `no-unbounded-promise-all` reports the second
+
+#### Scenario: A copy of each element in map
+
+- **WHEN** oxlint lints `const named = users.map((user) => ({ ...user, label: user.name }))`
+- **THEN** no performance rule reports it
 
 ### Requirement: A function outside the tests declares its return type
 

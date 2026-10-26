@@ -11,12 +11,15 @@ A typo in a namespace is already a compile error: the `Register` union refuses a
 ## What the rule reports
 
 - An array literal as the key of a call on the query client or on the query cache. The array inside the filters or the options object of such a call counts too.
+- A `const` of the same file whose initializer is that array literal, as in `const key = ['todos']` and then `{ queryKey: key }`. A `const` whose initializer is a filters object with an array literal as its `queryKey` counts too. The literal one statement above the call is the same copy.
+- A spread of an array literal in the arguments, as in `invalidateQueries(...[{ queryKey: ['todos'] }])`. The rule reads its elements as the arguments in their positions.
 - A literal that spreads a factory call and adds elements after it, as in `[...todoQueries.all(), "done"]`. The elements after the spread are the half that drifts. A prefix that no entry yields yet is an entry that the factory gains.
 - A call that goes through an indirection, where the arguments cannot be read. Call the method directly, as in `queryClient.invalidateQueries({ queryKey: todoQueries.all() })`.
 
 ## What the rule leaves alone
 
-- A key with one owner: a factory call, a variable, or the `.queryKey` of an entry.
+- A key with one owner: a factory call, a parameter, a `let` variable, a `const` of a different file, or the `.queryKey` of an entry.
+- A spread of a value that is not an array literal. That spread stands for an unknown number of arguments.
 - A key that arrives through a spread of a filters object, as in `{ ...base, queryFn }`. The property is declared in another object and possibly in another file.
 
 ## How the rule decides

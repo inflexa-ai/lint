@@ -35,11 +35,9 @@ export type SolidOptions = TypescriptOptions & {
 export function solid({ version, overrides = [], ...options }: SolidOptions = {}): OxlintConfig {
   const base = typescript(options)
 
-  return {
+  const config: OxlintConfig = {
     ...base,
     jsPlugins: [...(base.jsPlugins ?? []), pluginPath('@inflexa-ai/oxlint-plugin-solid/plugin'), pluginPath('eslint-plugin-solid')],
-    // oxlint reads `settings` from the root configuration only.
-    settings: version === undefined ? base.settings : { ...base.settings, solid: { version } },
     overrides: [
       ...(base.overrides ?? []),
       {
@@ -49,4 +47,7 @@ export function solid({ version, overrides = [], ...options }: SolidOptions = {}
       ...overrides,
     ],
   }
+  // oxlint reads `settings` from the root configuration only.
+  if (version !== undefined) config.settings = { ...base.settings, solid: { version } }
+  return config
 }

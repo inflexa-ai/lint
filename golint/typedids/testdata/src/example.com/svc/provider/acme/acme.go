@@ -24,3 +24,14 @@ type Owner struct {
 	OwnerUserID id  // want `OwnerUserID is a uuid.UUID, but ids.UserID exists`
 	BackupOrgID *id // want `BackupOrgID is a uuid.UUID, but ids.OrgID exists`
 }
+
+type Batch struct {
+	UserIDs     []uuid.UUID          // want `UserIDs holds uuid.UUID values, but ids.UserID exists`
+	OrgIDs      [4]*uuid.UUID        // want `OrgIDs holds uuid.UUID values, but ids.OrgID exists`
+	ByUserID    map[string]uuid.UUID // want `ByUserID holds uuid.UUID values, but ids.UserID exists`
+	UserIDNames map[uuid.UUID]string
+	ResourceIDs []uuid.UUID
+	UserIDsList []string
+}
+
+func Many(userIDs []uuid.UUID) {} // want `userIDs holds uuid.UUID values, but ids.UserID exists`

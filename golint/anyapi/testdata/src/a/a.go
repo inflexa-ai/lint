@@ -4,10 +4,21 @@ import "context"
 
 type JSONMap map[string]any
 
+type Payload any
+
+type Values []any
+
+type Document map[string]any
+
 type Notification struct {
 	Conditions map[string]any // want `Conditions exposes map\[string\]any in an exported API`
 	Payload    any            // want `Payload exposes any in an exported API`
-	Metadata   JSONMap
+	Metadata   JSONMap        // want `Metadata exposes map\[string\]any in an exported API: use a struct, or a named type with typed fields`
+	Items      []any          // want `Items exposes \[\]any in an exported API`
+	Body       Payload        // want `Body exposes any in an exported API`
+	List       Values         // want `List exposes \[\]any in an exported API`
+	Allowed    Document
+	Typed      []string
 	Tags       map[string]string
 	internal   map[string]any
 }
@@ -58,3 +69,5 @@ type TxContext interface {
 	context.Context
 	Tx() string
 }
+
+func Send(p Payload, vs ...Payload) {} // want `p exposes any in an exported API` `vs exposes any in an exported API`

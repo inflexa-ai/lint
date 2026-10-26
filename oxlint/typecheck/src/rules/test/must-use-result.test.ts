@@ -67,14 +67,18 @@ createRuleTester().run('must-use-result', mustUseResult, {
     // An arrow function whose body passes the Result on, as `isReturned` of upstream decides.
     `const run = () => externalFunction(getResult())`,
     // The checks and the properties that the inflexa subsystems read.
-    `const result = getResult()\nresult.isOk()`,
-    `const result = getResult()\nresult.isErr()`,
+    `const result = getResult()\nif (result.isOk()) {}`,
+    `const result = getResult()\nconst failed = result.isErr()`,
     `const result = getResult()\nresult.error`,
     `const result = getResult()\nresult.value`,
     `const result = getResult()\nresult.isOk`,
     `const result = getResult()\nresult.isErr`,
-    `getResult().isOk()`,
+    `const ok = getResult().isOk()`,
     `getResult().value`,
+    // `satisfies` keeps the value, thus the walk steps through it.
+    `${inflexa}(load() satisfies Result<number, Error>).unwrapOr(0)`,
+    `${inflexa}const r = load() satisfies Result<number, Error>\nr.unwrapOr(0)`,
+    { code: `${inflexa}unwrapOrThrow(load() satisfies Result<number, Error>)`, options: consumers },
     // The consumers of the option, through the wrappers that forward the same Result.
     { code: `${inflexa}unwrapOrThrow(await loadAsync())`, options: consumers },
     { code: `${inflexa}unwrapOrThrow(load() as Result<number, Error>)`, options: consumers },
@@ -149,5 +153,12 @@ createRuleTester().run('must-use-result', mustUseResult, {
     // An assignment to a variable declared earlier that no reference uses.
     { code: `${inflexa}let r: Result<number, Error>\nr = load()`, errors: [MUST_USE] },
     { code: `${inflexa}let r: Result<number, Error>\nr = load()\nexternalFunction(r)`, errors: [MUST_USE] },
+    // `satisfies` does not use the value.
+    { code: `${inflexa}load() satisfies Result<number, Error>`, errors: [MUST_USE] },
+    // A check whose answer no code reads does not use the value.
+    { code: `getResult().isOk()`, errors: [MUST_USE] },
+    { code: `getResult().map(() => {}).isErr()`, errors: [MUST_USE, MUST_USE] },
+    { code: `const result = getResult()\nresult.isOk()`, errors: [{ ...MUST_USE, line: 1, column: 16 }] },
+    { code: `const result = getResult()\nresult.isErr()`, errors: [{ ...MUST_USE, line: 1, column: 16 }] },
   ],
 })
