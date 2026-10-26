@@ -11,6 +11,8 @@ const FRAMEWORKS: Record<string, { source: string; methods: Set<string> }> = {
   mock: { source: 'bun:test', methods: new Set(['module']) },
 }
 
+const GLOBAL_OBJECTS = new Set(['globalThis', 'window', 'self', 'global'])
+
 /**
  * `vi.mock('../db', …)`, `jest.mock` and `mock.module` of `bun:test` swap a
  * module for a stand-in the framework builds, so the test runs a graph the
@@ -22,6 +24,10 @@ const FRAMEWORKS: Record<string, { source: string; methods: Set<string> }> = {
  * argument, a client is built from an injected `fetch`, a store is created for
  * the test. The stand-in is then a plain value the test controls, and the code
  * under test runs exactly as it does in the app.
+ *
+ * `vi.spyOn(namespace, 'name')` on a namespace import swaps an export of a
+ * module the same way, and `vi.stubGlobal` and a spy on `globalThis` swap a
+ * global under the code. Both are reported with the module mocks.
  *
  * The framework object is recognised by what it denotes: `vi`, `jest` and
  * `mock` from the test globals, and the same names imported from `vitest`,
@@ -39,6 +45,10 @@ export const noModuleMocking: Rule = {
     },
     schema: [],
     messages: {
+      namespaceSpy:
+        '`{{call}}` on the namespace `{{namespace}}` swaps an export of a module under the code, so the test runs a graph the app never assembles. Pass the dependency in instead, as an argument or in an options object, and hand the test a value it controls.',
+      globalStub:
+        '`{{call}}` swaps a global under the code, so the test runs a program the app never runs. Pass the dependency in instead: an options object with the clock, the HTTP client or the storage, and hand the test a value it controls.',
       moduleMock:
         '`{{call}}` replaces a whole module with a framework stand-in, so the test runs a graph the app never assembles. Pass the dependency in instead: take it as an argument, build the client from an injected `fetch`, or make the store the test needs. Then the stand-in is a value the test controls and the code runs as it does in the app.',
     },
@@ -83,8 +93,23 @@ export const noModuleMocking: Rule = {
         const framework = frameworkOf(callee.object)
         if (framework === undefined) return
         const method = staticMemberName(callee)
-        if (method !== undefined && FRAMEWORKS[framework.name].methods.has(method)) {
-          context.report({ node, messageId: 'moduleMock', data: { call: `${framework.path}.${method}` } })
+        if (method === undefined) return
+        const call = `${framework.path}.${method}`
+        if (FRAMEWORKS[framework.name].methods.has(method)) {
+          context.report({ node, messageId: 'moduleMock', data: { call } })
+          return
+        }
+        if (method === 'stubGlobal') {
+          context.report({ node, messageId: 'globalStub', data: { call } })
+          return
+        }
+        if (method !== 'spyOn' || node.arguments.length === 0) return
+        const [target] = node.arguments
+        if (target.type !== 'Identifier') return
+        if (isGlobalIdentifier(sourceCode, target) && GLOBAL_OBJECTS.has(target.name)) {
+          context.report({ node, messageId: 'globalStub', data: { call } })
+        } else if (importsOf(target).some(({ specifier }) => specifier.type === 'ImportNamespaceSpecifier')) {
+          context.report({ node, messageId: 'namespaceSpy', data: { call, namespace: target.name } })
         }
       },
     }

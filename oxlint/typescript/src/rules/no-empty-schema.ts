@@ -7,6 +7,24 @@ import { exportedName, isGlobalIdentifier, staticMemberName } from '../helpers/s
 const ACCEPTS_ANYTHING = new Set(['any', 'unknown'])
 
 /**
+ * Whether a check passes every value: a function that takes no parameter, or
+ * one whose body gives the literal `true`.
+ */
+function checksNothing(check: ESTree.Node | undefined): boolean {
+  if (check?.type !== 'ArrowFunctionExpression' && check?.type !== 'FunctionExpression') return false
+  if (check.params.length === 0) return true
+  const { body } = check
+  if (body === null) return false
+  if (body.type !== 'BlockStatement') return isTrue(body)
+  const [only] = body.body
+  return body.body.length === 1 && only.type === 'ReturnStatement' && only.argument !== null && isTrue(only.argument)
+}
+
+function isTrue(node: ESTree.Node): boolean {
+  return node.type === 'Literal' && node.value === true
+}
+
+/**
  * Every specifier that hands out zod: the library, and a configured re-export
  * of it in a module named `zod.ts`, which a repository can reach through an
  * alias or relatively.
@@ -28,7 +46,8 @@ const ZOD_EXPORT = 'z'
  *
  * `z.custom<T>(check)` with a real check is a schema: the tag check that tells
  * a `FormData` from a body built in another realm is one, and structural tests
- * like it are why the builder exists. Only the empty form is reported.
+ * like it are why the builder exists. Only the empty form is reported: no
+ * check, a check that takes no value, and a check that gives `true`.
  *
  * The receiver is recognised by the import it came from, so a rename
  * (`import { z as schema }`) and a namespace import (`zod.z.any()`) are the
@@ -92,7 +111,7 @@ export const noEmptySchema: Rule = {
         const builder = zodBuilder(node.callee)
         if (builder === undefined) return
 
-        const empty = ACCEPTS_ANYTHING.has(builder) || (builder === 'custom' && node.arguments.length === 0)
+        const empty = ACCEPTS_ANYTHING.has(builder) || (builder === 'custom' && (node.arguments.length === 0 || checksNothing(node.arguments[0])))
         if (empty) context.report({ node, messageId: 'emptySchema', data: { builder } })
       },
     }

@@ -11,6 +11,12 @@ const UNSAFE: Record<string, string> = {
   TSObjectKeyword: 'object',
 }
 
+// The builtin maps, which hold the value type in their second type argument.
+const MAPS = new Set(['Map', 'ReadonlyMap', 'WeakMap'])
+
+// The builtin arrays, which hold the element type in their only type argument.
+const ARRAYS = new Set(['Array', 'ReadonlyArray'])
+
 /** The declarations that give a name to something in this module, which shadows a global of that name. */
 function localNames(program: ESTree.Program): Set<string> {
   const names = new Set<string>()
@@ -43,19 +49,22 @@ function emptyInterfaceNames(program: ESTree.Program): Set<string> {
 }
 
 /**
- * `Record<string, unknown>`, `{ [key: string]: any }` and a mapped type over an
- * `object` value are a container with a typed key and an untyped value. A read
+ * `Record<string, unknown>`, `{ [key: string]: any }`, `Map<string, unknown>`
+ * and a mapped type over an `object` value are a container with a typed key
+ * and an untyped value. A read
  * off one gives the escape hatch back, so the parsing the value type skipped is
  * pushed to every reader. The value has a shape where it enters the program,
  * and a zod schema (`z.record(z.string(), Value)`) parses it into a dictionary
  * whose value type is that shape.
  *
- * The value is followed through `readonly`, a union, and an alias or empty
- * interface of the same file, so the hole cannot hide one hop away. Two things
+ * The value is followed through `readonly`, a union, an array element, and an
+ * alias or empty interface of the same file, so the hole cannot hide one hop
+ * away. Two things
  * are deliberately not followed, because reading one file cannot settle them:
  * a name from another file, and a generic container instantiated with the
  * escape hatch (`Bag<unknown>` for `type Bag<T> = Record<string, T>`). A
- * shadowed `Record` of one's own is left alone: it is not the builtin.
+ * shadowed `Record`, `Map` or `Array` of one's own is left alone: it is not the
+ * builtin.
  */
 export const noUnsafeDictionary: Rule = {
   meta: {
@@ -67,7 +76,7 @@ export const noUnsafeDictionary: Rule = {
     schema: [],
     messages: {
       unsafeDictionary:
-        'This dictionary has a typed key and a `{{value}}` value, so a read off it gives back a value nothing parsed. Type the value with the shape it has once it is parsed. `z.record(z.string(), Value)` parses untyped data into a dictionary whose value type is `z.infer` of the value schema.',
+        'This dictionary has a typed key and a `{{value}}` value, so a read off it gives back a value nothing parsed. Type the value with the shape it has once it is parsed. `z.record(z.string(), Value)` or `z.map(z.string(), Value)` parses untyped data into a dictionary whose value type is `z.infer` of the value schema.',
     },
   },
   create(context) {
@@ -75,12 +84,24 @@ export const noUnsafeDictionary: Rule = {
     let locals = new Set<string>()
     let emptyInterfaces = new Set<string>()
 
+    /** The element type of a builtin array, or `undefined` for a type that is not one. */
+    function elementType(type: ESTree.TSType): ESTree.TSType | undefined {
+      if (type.type === 'TSArrayType') return type.elementType
+      if (type.type !== 'TSTypeReference' || type.typeName.type !== 'Identifier' || !ARRAYS.has(type.typeName.name) || locals.has(type.typeName.name)) return undefined
+      return type.typeArguments?.params[0]
+    }
+
     /** The escape hatch a value type resolves to, or `undefined` when it names a real shape. */
     function unsafeValue(type: ESTree.TSType, visited = new Set<string>()): string | undefined {
       const resolved = unwrapTransparent(type)
       if (resolved.type in UNSAFE) return UNSAFE[resolved.type]
       if (resolved.type === 'TSTypeLiteral') return resolved.members.length === 0 ? 'empty object' : undefined
       if (resolved.type === 'TSUnionType') return resolved.types.some((member) => unsafeValue(member, visited)) ? 'union' : undefined
+      const element = elementType(resolved)
+      if (element !== undefined) {
+        const value = unsafeValue(element, visited)
+        return value === undefined ? undefined : `${value}[]`
+      }
       const name = bareReferenceName(resolved)
       if (name === undefined || visited.has(name)) return undefined
       if (emptyInterfaces.has(name)) return 'empty object'
@@ -102,7 +123,8 @@ export const noUnsafeDictionary: Rule = {
         emptyInterfaces = emptyInterfaceNames(node)
       },
       TSTypeReference(node) {
-        if (node.typeName.type !== 'Identifier' || node.typeName.name !== 'Record' || locals.has('Record')) return
+        if (node.typeName.type !== 'Identifier' || locals.has(node.typeName.name)) return
+        if (node.typeName.name !== 'Record' && !MAPS.has(node.typeName.name)) return
         const value = node.typeArguments?.params[1]
         if (value !== undefined) report(value)
       },

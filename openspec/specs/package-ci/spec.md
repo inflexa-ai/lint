@@ -88,7 +88,12 @@ The npm release SHALL stage and publish `@inflexa-ai/typecheck`, `@inflexa-ai/ox
 
 ### Requirement: The npm release covers each package of the workspace
 
-`oxlint/scripts/release.mjs` SHALL release each package of the workspace at one shared version, and SHALL publish `@inflexa-ai/oxlint-plugin` before the packages that depend on it. The dry run SHALL build, stage and pack each package, install the tarballs into a scratch project, and run oxlint there with `react()` and with `solid()`. The scratch project SHALL install TypeScript 7 as `@typescript/native` and TypeScript 6 as `typescript` at the versions of the root `devDependencies`, SHALL run `npm ls --all` there, and SHALL stop the release when that command exits non-zero. The run of `solid()` SHALL report a rule of `@inflexa-ai/oxlint-plugin` and a rule of `eslint-plugin-solid`, or the release stops. `.github/workflows/release-oxlint.yml` SHALL run when the manifest of a package of the workspace changes on the default branch.
+`oxlint/scripts/release.mjs` SHALL release each package of the workspace at one shared version, and SHALL publish `@inflexa-ai/oxlint-plugin` before the packages that depend on it. After each publish, the release SHALL wait until the document of the package on the registry lists the version, before it publishes the next package, and SHALL stop when the registry does not list it within 15 minutes. The dry run SHALL build, stage and pack each package, install the tarballs into a scratch project, and run oxlint there with `react()` and with `solid()`. The scratch project SHALL install TypeScript 7 as `@typescript/native` and TypeScript 6 as `typescript` at the versions of the root `devDependencies`, SHALL run `npm ls --all` there, and SHALL stop the release when that command exits non-zero. The run of `solid()` SHALL report a rule of `@inflexa-ai/oxlint-plugin` and a rule of `eslint-plugin-solid`, or the release stops. `.github/workflows/release-oxlint.yml` SHALL run when the manifest of a package of the workspace changes on the default branch.
+
+#### Scenario: The registry lags a publish
+
+- **WHEN** `npm publish` of `@inflexa-ai/oxlint-plugin` succeeds, and the registry lists the version only some minutes later
+- **THEN** the release publishes `@inflexa-ai/oxlint-plugin-react` and `@inflexa-ai/oxlint-plugin-solid` only after the registry lists it
 
 #### Scenario: A dry run of the release
 

@@ -24,6 +24,10 @@ createRuleTester().run('no-empty-schema', noEmptySchema, {
     { code: `const Anything = z.any()`, errors: empty('any') },
     { code: `const Whatever = z.unknown()`, errors: empty('unknown') },
     { code: `const Claimed = z.custom<Project>()`, errors: empty('custom') },
+    { code: `const Claimed = z.custom<Project>(() => true)`, errors: empty('custom') },
+    { code: `const Claimed = z.custom<Project>((value) => true)`, errors: empty('custom') },
+    { code: `const Claimed = z.custom<Project>(function (value) { return true })`, errors: empty('custom') },
+    { code: `const Claimed = z.custom<Project>(() => isProject(current))`, errors: empty('custom') },
     // Where it does the most damage: the schema an untrusted client demands.
     { code: `await pubchem.get('/compounds/aspirin', { schema: z.any() })`, errors: empty('any') },
     { code: `const Row = z.object({ payload: z.any() })`, errors: empty('any') },

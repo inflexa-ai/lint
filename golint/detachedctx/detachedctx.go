@@ -22,7 +22,7 @@ const (
 A call inside a defer, or inside a function literal passed to a hook method
 such as a commit or rollback hook, runs when the request can be over. A
 request context is then canceled, and the cleanup fails. Pass a context
-that comes from context.WithoutCancel or context.Background.`
+that comes from context.WithoutCancel.`
 )
 
 // Settings configures the analyzer. A nil list gives the default; an empty

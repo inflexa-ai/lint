@@ -16,6 +16,8 @@ What remains is the task of turning an arbitrary thrown value into an `Error` fo
 
 - `error instanceof Error`, with the global `Error` on the right.
 - `Error.isError(value)` in any spelling: `Error.isError?.(value)` and `Error['isError'](value)` too. The method asks the same question across realms. It is new in ES2026, and the `lib` setting of the repository cannot express it yet. The rule covers it now, so a later raise of `lib` does not quietly open a second spelling of the same question.
+- `Error.prototype.isPrototypeOf(value)`, and the borrowed form `Object.prototype.isPrototypeOf.call(Error.prototype, value)`.
+- A schema of the class, as in `z.instanceof(Error)`. It is the same comparison behind a parser.
 
 ## What the rule leaves alone
 
@@ -25,4 +27,4 @@ What remains is the task of turning an arbitrary thrown value into an `Error` fo
 
 ## Options
 
-- `allowIn` — file name patterns where the rule stays silent. List the one module that normalizes thrown values there.
+- `allowIn` — file name patterns where the rule stays silent. List the one module that normalizes thrown values there. If the repository has no such module, write it and add its path to `allowIn`.

@@ -7,7 +7,9 @@ import {
   isFunctionExpression,
   isIdentifier,
   isParenthesizedExpression,
+  isExpressionStatement,
   isPropertyAccessExpression,
+  isSatisfiesExpression,
   isSourceFile,
   isVariableDeclaration,
   isYieldExpression,
@@ -38,11 +40,11 @@ const FORWARDING_METHODS = new Set(['orElse', 'map', 'mapErr', 'andThen'])
  * The parents that leave a value out of the rule, as upstream leaves them: a
  * type assertion or a non-null assertion (upstream: a parent whose ESTree type
  * starts with `TS`), and the declarations whose values it cannot follow, such
- * as a class field that a method reads through `this`.
+ * as a class field that a method reads through `this`. Unlike upstream, the
+ * rule steps through `satisfies`, which keeps the value and its type.
  */
 const IGNORED_PARENTS = new Set<SyntaxKind>([
   SyntaxKind.AsExpression,
-  SyntaxKind.SatisfiesExpression,
   SyntaxKind.TypeAssertionExpression,
   SyntaxKind.NonNullExpression,
   SyntaxKind.ClassDeclaration,
@@ -54,19 +56,25 @@ const IGNORED_PARENTS = new Set<SyntaxKind>([
 /** The nodes where a walk up to a use stops: the nearest block or the file, as upstream stops at a block or the program. */
 const END_OF_WALK = new Set<SyntaxKind>([SyntaxKind.Block, SyntaxKind.SourceFile])
 
-/** The parent of a node above the parentheses around it, which the ESTree of upstream does not have, or `undefined` for the file. */
+/** The parent of a node above the parentheses and the `satisfies` around it, which the ESTree of upstream does not have, or `undefined` for the file. */
 function parentOf(node: Node): Node | undefined {
   if (isSourceFile(node)) return undefined
   let parent = node.parent
-  while (isParenthesizedExpression(parent)) parent = parent.parent
+  while (isParenthesizedExpression(parent) || isSatisfiesExpression(parent)) parent = parent.parent
   return parent
 }
 
-/** A node without the parentheses around it. */
+/** A node without the parentheses and the `satisfies` around it. */
 function unwrap(node: Node): Node {
   let current = node
-  while (isParenthesizedExpression(current)) current = current.expression
+  while (isParenthesizedExpression(current) || isSatisfiesExpression(current)) current = current.expression
   return current
+}
+
+/** Whether code reads the answer of the call of `isOk` or `isErr` whose callee is `access`. */
+function isReadCheck(access: Node): boolean {
+  const statement = parentOf(access.parent)
+  return statement === undefined || !isExpressionStatement(statement)
 }
 
 /** The name of a property access, or `undefined` for an element access and a private name, as upstream reads only an identifier. */
@@ -118,6 +126,7 @@ function isHandledResult(node: Node): boolean {
   if (parent !== undefined && isAwaitExpression(parent)) return isHandledResult(parent)
   if (parent !== undefined && (isPropertyAccessExpression(parent) || parent.kind === SyntaxKind.ElementAccessExpression)) {
     const name = memberName(parent)
+    if (name !== undefined && CHECKED_METHODS.has(name) && isCallee(parent)) return isReadCheck(parent)
     if (name !== undefined && HANDLED_METHODS.has(name) && isCallee(parent)) return true
     if (name !== undefined && HANDLED_PROPERTIES.has(name)) return true
     // A chain of method calls: `.map(…).unwrapOr(…)`.
@@ -127,13 +136,12 @@ function isHandledResult(node: Node): boolean {
   return false
 }
 
-/** Upstream `isCheckedResult`: a variable whose `isOk` or `isErr` is read inside a call. */
+/** Upstream `isCheckedResult`: a variable whose `isOk` or `isErr` is called, and code reads the answer of the call. */
 function isCheckedResult(node: Node): boolean {
   const parent = parentOf(node)
   if (!isIdentifier(node) || parent === undefined) return false
   const name = memberName(parent)
-  const above = parentOf(parent)
-  return name !== undefined && CHECKED_METHODS.has(name) && above !== undefined && isCallExpression(above)
+  return name !== undefined && CHECKED_METHODS.has(name) && isCallee(parent) && isReadCheck(parent)
 }
 
 /** Upstream `isReturned`: an ancestor up to the nearest block is a `return` or an arrow function. */
@@ -185,7 +193,7 @@ export const mustUseResult: RuleModule<Options> = {
       url: 'https://github.com/inflexa-ai/lint/blob/main/docs/rules/must-use-result.md',
     },
     messages: {
-      mustUseResult: 'Result must be handled with either of match, unwrapOr, _unsafeUnwrap or _unsafeUnwrapErr.',
+      mustUseResult: 'Handle the Result: call `match` or `unwrapOr`, or branch on `isOk()` or `isErr()`.',
     },
     defaultOptions: { consumers: [] },
   },

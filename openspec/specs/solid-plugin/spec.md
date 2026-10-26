@@ -93,20 +93,20 @@ The package `@inflexa-ai/oxlint-plugin-solid` gives a SolidJS repository of Infl
 `@inflexa-ai/solid/require-cleanup` SHALL report a subscription call whose nearest enclosing function is a component, when no call of `onCleanup` of `solid-js` has that same function as its nearest enclosing function.
 
 - A component is a function whose own name, or the name of the variable that it initializes, starts with an uppercase letter, or a function that returns JSX (an arrow with a JSX body, or a `return` of JSX among the statements of its block). A component nested in another component is a component of its own.
-- A subscription call is a call of a member named `on`; a call of `addEventListener`, as the global or as a member; or a call of `setInterval`, as the global or as a member. A call of the member `on` of a namespace import of `solid-js` is the helper `on` of Solid and not a subscription.
+- A subscription call is a call of a member named `on`, or a call of `addEventListener`, as the global or as a member. A timer such as `setInterval` SHALL NOT be a subscription call, because the timers ban of `typescript()` reports it with its own fix. A call of the member `on` of a namespace import of `solid-js` is the helper `on` of Solid and not a subscription.
 - A call of `onCleanup` is a call whose callee resolves to the binding of a named import of `onCleanup` from `solid-js`, under any local name, or a call of the member `onCleanup` of the binding of a namespace import of `solid-js`. A local binding that shadows the import is not `onCleanup`.
 
-One `onCleanup` call satisfies each subscription of the same function, and the rule does not read what the cleanup does. The rule SHALL NOT report a subscription inside a nested function that is not itself a component (an effect, an `onMount` callback, a `ref` callback, an event handler), a subscription in a function that is not a component, a subscription at module scope, or a call of a local binding named `setInterval` or `addEventListener`. The rule has no options.
+One `onCleanup` call satisfies each subscription of the same function, and the rule does not read what the cleanup does. The rule SHALL NOT report a subscription inside a nested function that is not itself a component (an effect, an `onMount` callback, a `ref` callback, an event handler), a subscription in a function that is not a component, a subscription at module scope, or a call of a local binding named `addEventListener`. The rule has no options.
 
 #### Scenario: A listener with no cleanup
 
 - **WHEN** a file holds `function Sidebar() { Bus.on('inflexa', handle); return <box /> }`
 - **THEN** the rule reports the `Bus.on` call
 
-#### Scenario: A timer with its cleanup
+#### Scenario: A timer
 
-- **WHEN** a file holds `const Spinner = () => { const timer = setInterval(tick, 80); onCleanup(() => clearInterval(timer)); return <text /> }`, and `onCleanup` comes from `solid-js`
-- **THEN** the rule reports nothing
+- **WHEN** a file holds `function Status() { setInterval(tick, 1000); return <box /> }`
+- **THEN** the rule reports nothing, because the timers ban owns the timer
 
 #### Scenario: A cleanup in a different function
 
@@ -120,8 +120,8 @@ One `onCleanup` call satisfies each subscription of the same function, and the r
 
 #### Scenario: A render callback that subscribes
 
-- **WHEN** a component holds `<For each={rows()}>{(row) => { const timer = setInterval(tick, 1000); return <text /> }}</For>`, and the callback holds no `onCleanup`
-- **THEN** the rule reports the `setInterval` call, because the callback returns JSX and is a component
+- **WHEN** a component holds `<For each={rows()}>{(row) => { window.addEventListener('resize', fit); return <text /> }}</For>`, and the callback holds no `onCleanup`
+- **THEN** the rule reports the `addEventListener` call, because the callback returns JSX and is a component
 
 #### Scenario: A local binding that shadows onCleanup
 

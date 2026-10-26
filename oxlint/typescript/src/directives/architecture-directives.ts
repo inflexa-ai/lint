@@ -9,12 +9,14 @@ export type FileViolation = Violation & { file: string }
 
 /**
  * The rules that no file can switch off in silence: by default, the rules of
- * the plugins of this workspace, whose names start with `@inflexa-ai/`. The
- * command takes other prefixes through `--prefix`, and other rules that can be
+ * the plugins of this workspace, whose names start with `@inflexa-ai/`, and the
+ * typed rules of `@inflexa-ai/typecheck`, whose ids have no prefix. The command
+ * takes other prefixes through `--prefix`, and other rules that can be
  * disabled inline through `--allow-inline`.
  */
 export const ARCHITECTURE_RULES = {
   prefixes: ['@inflexa-ai/'],
+  rules: ['must-use-result', 'no-generated-empty-object-type', 'no-lookup-in-loop', 'require-abort-signal'],
   // Where one test file has to sit is a fact about that test, and there is
   // nothing for the lint configuration to decide about it.
   inlineAllowed: ['@inflexa-ai/test-placement'],
@@ -75,8 +77,10 @@ function positionAt(text: string, index: number): { line: number; column: number
  * suppresses nothing, and a file with an unterminated comment fails the
  * compile and reaches no merge.
  */
-export function findArchitectureDirectiveViolations(text: string, prefixes: string[], inlineAllowed: string[] = []): Violation[] {
+export function findArchitectureDirectiveViolations(text: string, prefixes: string[], inlineAllowed: string[] = [], guardedRules: string[] = []): Violation[] {
   const violations: Violation[] = []
+  const allowed = new Set(inlineAllowed)
+  const guarded = new Set(guardedRules)
 
   for (const pattern of [LINE_DIRECTIVE, BLOCK_DIRECTIVE]) {
     for (const match of text.matchAll(pattern)) {
@@ -114,9 +118,9 @@ export function findArchitectureDirectiveViolations(text: string, prefixes: stri
       }
 
       for (const rule of rules) {
-        if (!prefixes.some((prefix) => rule.startsWith(prefix))) continue
+        if (!guarded.has(rule) && !prefixes.some((prefix) => rule.startsWith(prefix))) continue
 
-        if (inlineAllowed.includes(rule)) {
+        if (allowed.has(rule)) {
           if (justification) continue
           violations.push({
             ...position,
@@ -158,6 +162,8 @@ export type CheckOptions = {
   cwd?: string
   prefixes?: string[]
   inlineAllowed?: string[]
+  /** The ids of the rules that the check guards with no prefix. */
+  guardedRules?: string[]
 }
 
 /**
@@ -165,11 +171,18 @@ export type CheckOptions = {
  * folder, relative to `cwd`.
  */
 export async function checkArchitectureDirectives(paths: string[], options: CheckOptions = {}): Promise<FileViolation[]> {
-  const { ignores = [], cwd = process.cwd(), prefixes = ARCHITECTURE_RULES.prefixes, inlineAllowed = ARCHITECTURE_RULES.inlineAllowed } = options
+  const {
+    ignores = [],
+    cwd = process.cwd(),
+    prefixes = ARCHITECTURE_RULES.prefixes,
+    inlineAllowed = ARCHITECTURE_RULES.inlineAllowed,
+    guardedRules = ARCHITECTURE_RULES.rules,
+  } = options
   const violations: FileViolation[] = []
 
   async function* files(): AsyncGenerator<string> {
     for (const start of paths) {
+      // oxlint-disable-next-line no-await-in-loop -- the walk is the source of the queue below, and the workers that read it bound the reads
       for await (const file of sourceFiles(path.resolve(cwd, start))) {
         const relative = path.relative(cwd, file)
         if (!ignores.some((glob) => path.matchesGlob(relative, glob))) yield relative
@@ -182,7 +195,7 @@ export async function checkArchitectureDirectives(paths: string[], options: Chec
   async function worker(): Promise<void> {
     for await (const file of queue) {
       const text = await readFile(path.resolve(cwd, file), 'utf8')
-      for (const violation of findArchitectureDirectiveViolations(text, prefixes, inlineAllowed)) violations.push({ file, ...violation })
+      for (const violation of findArchitectureDirectiveViolations(text, prefixes, inlineAllowed, guardedRules)) violations.push({ file, ...violation })
     }
   }
   await Promise.all(Array.from({ length: READ_CONCURRENCY }, worker))

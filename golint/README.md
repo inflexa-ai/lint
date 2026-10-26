@@ -42,6 +42,12 @@ this module:
   and the names of the typed IDs of the repository for `typedids`.
 - `golangci/rules.go`, the ruleguard patterns that gocritic loads.
 
+exhaustive accepts a switch with a `default:` clause as exhaustive. Thus a
+ruleguard pattern of the base reports an empty `default:` in a switch on an
+enum, which is a named integer or string type. A `default:` of such a switch
+must panic, return an error, or do work. The pattern reads only a `default:`
+that is the last clause.
+
 When the overlay sets the `ids-package` of `typedids`, `inflexa-lint-config`
 loads that package and writes its names into `.golangci.yml`. The names are part of the key of the
 lint cache, thus a new typed ID makes golangci-lint analyze each package again.

@@ -4,7 +4,8 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { checkArchitectureDirectives, findArchitectureDirectiveViolations } from '../architecture-directives.ts'
+import { rules as typedRules } from '../../../../typecheck/src/rules/index.ts'
+import { ARCHITECTURE_RULES, checkArchitectureDirectives, findArchitectureDirectiveViolations } from '../architecture-directives.ts'
 
 const find = (text: string) => findArchitectureDirectiveViolations(text, ['@inflexa-ai/'])
 const findAllowing = (text: string) => findArchitectureDirectiveViolations(text, ['@inflexa-ai/'], ['@inflexa-ai/test-placement'])
@@ -117,6 +118,16 @@ describe('findArchitectureDirectiveViolations', () => {
     const violations = find(`// oxlint-disable-next-line ${rule}\nvoid api.get('/p')`)
     expect(violations).toHaveLength(1)
     expect(violations[0].message).toContain(`\`${rule}\``)
+  })
+
+  it.each(['must-use-result', 'no-lookup-in-loop', 'require-abort-signal'])('reports an inline disable of the built-in typed rule %s', (rule) => {
+    const violations = findArchitectureDirectiveViolations(`// typecheck-disable-next-line ${rule} -- the list is short\nx`, ['@inflexa-ai/'], [], [rule])
+    expect(violations).toHaveLength(1)
+    expect(violations[0].message).toContain(`\`${rule}\` is an architecture rule`)
+  })
+
+  it('protects each typed rule of @inflexa-ai/typecheck by its id', () => {
+    expect([...ARCHITECTURE_RULES.rules].sort()).toEqual(Object.keys(typedRules).sort())
   })
 
   it('honours the configured prefixes', () => {
@@ -244,6 +255,17 @@ describe('checkArchitectureDirectives', () => {
     const failed = spawnSync(process.execPath, [cli, 'src/typed.ts'], { cwd: root, encoding: 'utf8' })
     expect(failed.status).toBe(1)
     expect(failed.stderr).toContain('src/typed.ts:1:1: `@inflexa-ai/react/no-inline-query-key` is an architecture rule')
+  })
+
+  it('protects the built-in typed rules by default', async () => {
+    await writeFile(path.join(root, 'src/lookup.ts'), '// typecheck-disable-next-line no-lookup-in-loop -- the list is short\n')
+    const violations = await checkArchitectureDirectives(['src/lookup.ts'], { cwd: root })
+    expect(violations).toHaveLength(1)
+    expect(violations[0].message).toContain('`no-lookup-in-loop` is an architecture rule')
+    const cli = fileURLToPath(new URL('../cli.ts', import.meta.url))
+    const prefixed = spawnSync(process.execPath, [cli, '--prefix', 'acme/', 'src/lookup.ts'], { cwd: root, encoding: 'utf8' })
+    expect(prefixed.status).toBe(1)
+    expect(prefixed.stderr).toContain('src/lookup.ts:1:1: `no-lookup-in-loop` is an architecture rule')
   })
 
   it('takes the prefixes and the rules that can be disabled inline from the command line', () => {

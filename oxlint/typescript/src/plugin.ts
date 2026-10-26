@@ -1,5 +1,6 @@
 import type { Plugin } from '@oxlint/plugins'
 import { exportAtDeclaration } from './rules/export-at-declaration.ts'
+import { noAccumulatingCopy } from './rules/no-accumulating-copy.ts'
 import { noConditionalSpread } from './rules/no-conditional-spread.ts'
 import { noDoubleCast } from './rules/no-double-cast.ts'
 import { noEmptySchema } from './rules/no-empty-schema.ts'
@@ -8,6 +9,7 @@ import { noInterface } from './rules/no-interface.ts'
 import { noModuleMocking } from './rules/no-module-mocking.ts'
 import { noRawNetwork } from './rules/no-raw-network.ts'
 import { noTypeofObject } from './rules/no-typeof-object.ts'
+import { noUnboundedPromiseAll } from './rules/no-unbounded-promise-all.ts'
 import { noUnknownParameters } from './rules/no-unknown-parameters.ts'
 import { noUnknownReturns } from './rules/no-unknown-returns.ts'
 import { noUnknownTypeAliases } from './rules/no-unknown-type-aliases.ts'
@@ -27,6 +29,7 @@ export const NAMESPACE = '@inflexa-ai'
  */
 const rules = {
   'export-at-declaration': exportAtDeclaration,
+  'no-accumulating-copy': noAccumulatingCopy,
   'no-conditional-spread': noConditionalSpread,
   'no-double-cast': noDoubleCast,
   'no-empty-schema': noEmptySchema,
@@ -35,6 +38,7 @@ const rules = {
   'no-module-mocking': noModuleMocking,
   'no-raw-network': noRawNetwork,
   'no-typeof-object': noTypeofObject,
+  'no-unbounded-promise-all': noUnboundedPromiseAll,
   'no-unknown-parameters': noUnknownParameters,
   'no-unknown-returns': noUnknownReturns,
   'no-unknown-type-aliases': noUnknownTypeAliases,

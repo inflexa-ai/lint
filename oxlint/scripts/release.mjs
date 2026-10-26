@@ -67,6 +67,31 @@ function sleep(seconds) {
   spawnSync('sleep', [String(seconds)])
 }
 
+/** Whether the document of the package, which `npm install` reads to resolve a version, lists this version. */
+async function installable(name, version) {
+  const response = await fetch(`https://registry.npmjs.org/${name.replace('/', '%2f')}`, { headers: { accept: 'application/vnd.npm.install-v1+json' } })
+  if (response.status === 404) return false
+  if (!response.ok) fail(`the registry answered ${String(response.status)} for ${name}`)
+  const document = await response.json()
+  return Object.hasOwn(document.versions ?? {}, version)
+}
+
+/**
+ * Waits until `npm install` can resolve this version. The next package depends
+ * on exactly this version, and the registry can lag a publish by minutes, thus
+ * a dependent package published before then cannot install in that window.
+ */
+async function waitUntilInstallable(name, version) {
+  const deadline = Date.now() + 15 * 60 * 1000
+  // oxlint-disable-next-line no-await-in-loop -- each check reads the registry after the wait before it
+  while (!(await installable(name, version))) {
+    if (Date.now() > deadline) fail(`npm did not list ${name}@${version} within 15 minutes of the publish`)
+    console.log(`release: wait until npm lists ${name}@${version}`)
+    sleep(15)
+  }
+  console.log(`release: ${name}@${version} installs from npm`)
+}
+
 const packages = PACKAGES.map((dir) => ({ dir, manifest: requireJson(path.join(workspace, dir, 'package.json')) }))
 const version = packages[0].manifest.version
 for (const { manifest } of packages) {
@@ -204,6 +229,7 @@ for (const { name, target } of staged) {
   // A PUT that failed on this side can still land on the registry, thus each
   // attempt asks the registry first.
   for (let attempt = 1; ; attempt++) {
+    // oxlint-disable-next-line no-await-in-loop -- each attempt reads the result of the one before it, and the packages publish in the order of their dependencies
     if (await published(name, version)) {
       console.log(`release: ${name}@${version} is on npm`)
       break
@@ -213,6 +239,8 @@ for (const { name, target } of staged) {
     if (spawnSync('npm', ['publish'], { cwd: target, stdio: 'inherit' }).status === 0) break
     sleep(30 * attempt)
   }
+  // oxlint-disable-next-line no-await-in-loop -- a package publishes only after npm lists each package that it depends on
+  await waitUntilInstallable(name, version)
 }
 
 if (capture('git', ['ls-remote', '--exit-code', '--tags', 'origin', `refs/tags/${tag}`]).status === 0) {

@@ -11,7 +11,7 @@ A deferred call, or a hook that runs after a commit or a rollback, runs when the
 - A call inside a `defer` statement, or inside the body of a deferred function literal, that passes a context which the request can cancel.
 - A call inside a function literal that is an argument of a method of `hook-methods`, with the same condition.
 
-The rule reports an argument that is an identifier of type `context.Context`, declared outside the deferred call or the function literal. It does not report the argument when the context is detached. A context is detached when each value of its identifier comes from `context.WithoutCancel` or `context.Background`, directly or through more `context.With*` calls.
+The rule reports an argument that is an identifier of type `context.Context`, declared outside the deferred call or the function literal. It does not report the argument when the context is detached. A context is detached when each value of its identifier comes from `context.WithoutCancel`, directly or through more `context.With*` calls. The rule also reads `context.Background` as detached, but forbidigo reports `context.Background` outside test files and `cmd/`.
 
 ## What the rule leaves alone
 

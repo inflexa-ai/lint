@@ -35,7 +35,7 @@ whose rules it copies, for example `portedRuleMode: 'curated'`.
 Two parts of the lint cannot run in oxlint:
 
 - The rules that read types: `must-use-result`, `require-abort-signal`,
-  `no-generated-empty-object-type`, and the rules of the React plugin of
+  `no-generated-empty-object-type`, `no-lookup-in-loop`, and the rules of the React plugin of
   `inflexa-typecheck`. oxlint gives a JS plugin no type information.
   `inflexa-typecheck` of `@inflexa-ai/typecheck` runs them on the program of
   TypeScript 7. Refer to [its README](./typecheck/README.md).

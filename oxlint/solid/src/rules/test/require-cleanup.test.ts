@@ -38,6 +38,9 @@ ruleTester.run('require-cleanup', requireCleanup, {
     `function Clock() { const setInterval = (fn) => fn(); setInterval(tick); return <text /> }`,
     `function Page({ addEventListener }) { addEventListener('resize', fit); return <box /> }`,
     `import { setInterval } from './timers.ts'\nfunction Clock() { setInterval(tick, 1000); return <text /> }`,
+    // A timer is no subscription here: the timers ban of typescript() reports it, with its own fix.
+    `function Status() { setInterval(tick, 1000); return <box /> }`,
+    `function Status() { globalThis.setInterval(tick, 1000); return <box /> }`,
     // A component with no subscription needs no cleanup, of any module.
     `import { onCleanup } from '@acme/lifecycle'\nfunction Sidebar() { onCleanup(stop); return <box /> }`,
     // The helper `on` of Solid is not a subscription.
@@ -68,13 +71,11 @@ ruleTester.run('require-cleanup', requireCleanup, {
     // A component by the JSX that it returns.
     { code: `const view = () => { Bus.on('inflexa', handle); return <box /> }`, errors: [missing('Bus.on')] },
     { code: `const view = () => <text>{Bus.on('inflexa', handle)}</text>`, errors: [missing('Bus.on')] },
-    { code: `export default function () { const timer = setInterval(tick, 80); return <text /> }`, errors: [missing('setInterval')] },
+    { code: `export default function () { window.addEventListener('resize', fit); return <text /> }`, errors: [missing('window.addEventListener')] },
     // Each subscription: a global and a member of each name.
     { code: `function Status() { addEventListener('resize', fit); return <box /> }`, errors: [missing('addEventListener')] },
     { code: `function Status() { window.addEventListener('resize', fit); return <box /> }`, errors: [missing('window.addEventListener')] },
     { code: `function Status() { renderer.addEventListener('resize', fit); return <box /> }`, errors: [missing('renderer.addEventListener')] },
-    { code: `function Status() { setInterval(tick, 1000); return <box /> }`, errors: [missing('setInterval')] },
-    { code: `function Status() { globalThis.setInterval(tick, 1000); return <box /> }`, errors: [missing('globalThis.setInterval')] },
     { code: `function Status() { props.store.on('change', reload); return <box /> }`, errors: [missing('props.store.on')] },
     {
       code: `function Status() { Bus.on('a', first); window.addEventListener('resize', fit); return <box /> }`,
@@ -87,8 +88,8 @@ ruleTester.run('require-cleanup', requireCleanup, {
     },
     // A render callback that subscribes is a component of its own.
     {
-      code: `function Rows() { return <For each={rows()}>{(row) => { const timer = setInterval(tick, 1000); return <text /> }}</For> }`,
-      errors: [missing('setInterval')],
+      code: `function Rows() { return <For each={rows()}>{(row) => { window.addEventListener('resize', fit); return <text /> }}</For> }`,
+      errors: [missing('window.addEventListener')],
     },
     {
       code: `${cleanup}function Rows() { onCleanup(stop); return <For each={rows()}>{(row) => { row.on('change', reload); return <text /> }}</For> }`,

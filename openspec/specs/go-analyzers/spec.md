@@ -21,7 +21,7 @@ Each of the analyzers `typedids`, `errtext`, `notfoundguard`, `blankerr`, `bound
 
 ### Requirement: typedids reports a uuid.UUID that has a typed ID
 
-`typedids` SHALL take the settings `ids-package` (an import path) and `names` (the typed ID names). It SHALL report a struct field, a function parameter or a function result whose name ends with a name of `names` (`<X>ID`, or `<x>ID` for an unexported name) and whose type is `uuid.UUID` or `*uuid.UUID` of `github.com/google/uuid` or of the standard library package `uuid`. The message SHALL name the typed ID with the package name of `ids-package`. The analyzer SHALL need no import path from the analyzed package to `ids-package`.
+`typedids` SHALL take the settings `ids-package` (an import path) and `names` (the typed ID names). It SHALL report a struct field, a function parameter or a function result whose name ends with a name of `names` (`<X>ID`, or `<x>ID` for an unexported name) and whose type is `uuid.UUID` or `*uuid.UUID` of `github.com/google/uuid` or of the standard library package `uuid`. It SHALL read through a slice, an array and a map value, and for such a type the plural name (`<X>IDs`, `<x>IDs`) SHALL also match. The message SHALL name the typed ID with the package name of `ids-package`. The analyzer SHALL need no import path from the analyzed package to `ids-package`.
 
 #### Scenario: A field with a typed ID counterpart
 
@@ -33,6 +33,11 @@ Each of the analyzers `typedids`, `errtext`, `notfoundguard`, `blankerr`, `bound
 - **WHEN** `names` holds `UserID`, and a struct in a package that imports `uuid` of the standard library declares `UserID uuid.UUID`
 - **THEN** the analyzer reports the field with a message that names `ids.UserID`
 
+#### Scenario: A slice of IDs
+
+- **WHEN** `names` holds `UserID`, and a struct declares `UserIDs []uuid.UUID`
+- **THEN** the analyzer reports the field with a message that names `ids.UserID`
+
 #### Scenario: A name that is not a typed ID
 
 - **WHEN** `names` holds `UserID` and `OrgID`, and a struct declares `ResourceID uuid.UUID`
@@ -40,12 +45,17 @@ Each of the analyzers `typedids`, `errtext`, `notfoundguard`, `blankerr`, `bound
 
 ### Requirement: errtext reports a condition on the text of an error
 
-`errtext` SHALL report a call `e.Error()` where `e` has the interface type `error`, when the call is an operand of `==` or `!=`, an argument of `strings.Contains`, `strings.HasPrefix`, `strings.HasSuffix` or `strings.EqualFold`, or the tag or a case expression of a `switch`. It SHALL leave alone `Error()` in any other position, and `Error()` on a value of a concrete type.
+`errtext` SHALL report a call `e.Error()` where `e` has the interface type `error`, when the call is an operand of `==` or `!=`, an argument of `strings.Contains`, `strings.ContainsAny`, `strings.HasPrefix`, `strings.HasSuffix`, `strings.EqualFold`, `strings.Index`, `strings.LastIndex` or `regexp.MatchString` (the function or the method of `*regexp.Regexp`), or the tag or a case expression of a `switch`. It SHALL report the same positions for a use of a local variable whose value is such a call, as in `msg := err.Error()`. It SHALL leave alone `Error()` in any other position, and `Error()` on a value of a concrete type.
 
 #### Scenario: A branch on the text
 
 - **WHEN** a handler holds `if strings.Contains(err.Error(), "circular nesting") {`
 - **THEN** the analyzer reports the `err.Error()` call
+
+#### Scenario: The text in a local variable
+
+- **WHEN** a function holds `msg := err.Error()` and then `if strings.Contains(msg, "x") {`
+- **THEN** the analyzer reports the use of `msg` in the condition
 
 #### Scenario: The text in a log
 
@@ -117,12 +127,17 @@ For `notfoundguard`, the error test of a statement is the innermost enclosing `i
 
 ### Requirement: boundedfanout reports unbounded fan-out and a goroutine without a lifecycle or a join
 
-`boundedfanout` SHALL report a call of `Go` on a `*golang.org/x/sync/errgroup.Group` inside the body of a `for` or `for ... range` statement, also through a nested function literal, when the enclosing function declaration has no `SetLimit` call on the same group. It SHALL also report a `go` statement whose enclosing function declaration (the innermost one, through any function literal) sits in a package whose import path starts with no entry of the setting `allowed-packages`, unless that function returns a type of the same package that has a method named in the setting `stop-methods` (default `Stop`, `Close`, `Shutdown`), or is a method named in the setting `start-methods` (default `Start`, `Run`) of such a type, or calls `Wait` on a `sync.WaitGroup` or an `errgroup.Group`.
+`boundedfanout` SHALL report a goroutine inside the body of a `for` or `for ... range` statement, also through a nested function literal, when no bound is present. A goroutine is a `go` statement, a call of `Go` on a `sync.WaitGroup`, or a call of `Go` or `TryGo` on a `*golang.org/x/sync/errgroup.Group`. A bound is a `SetLimit` call on the same group in the enclosing function declaration, a send on a channel or a call of `Acquire` or `TryAcquire` on a `*golang.org/x/sync/semaphore.Weighted` in the body of the innermost loop before the goroutine and outside it, or a constant count on each enclosing loop. A `SetLimit` with a constant value at or below zero SHALL NOT count as a bound, and a `SetLimit` with a value that is not constant SHALL count as a bound. A `go` statement and a call of `Go` on a `sync.WaitGroup` in a package whose import path starts with an entry of the setting `allowed-packages` SHALL get no report. In each other package, the analyzer SHALL also report a `go` statement or a call of `Go` on a `sync.WaitGroup`, with its enclosing function declaration (the innermost one, through any function literal), unless that function returns a type of the same package that has a method named in the setting `stop-methods` (default `Stop`, `Close`, `Shutdown`), or is a method named in the setting `start-methods` (default `Start`, `Run`) of such a type, or calls `Wait` on a `sync.WaitGroup` or an `errgroup.Group`.
 
 #### Scenario: One goroutine for each grant
 
 - **WHEN** a method holds `g, gCtx := errgroup.WithContext(ctx); for _, grant := range grants { g.Go(func() error { ... }) }`
-- **THEN** the analyzer reports the `g.Go` call, and reports nothing when `g.SetLimit(8)` precedes the loop
+- **THEN** the analyzer reports the `g.Go` call, and reports nothing when `g.SetLimit(8)` precedes the loop, and reports the call when `g.SetLimit(-1)` precedes the loop
+
+#### Scenario: A WaitGroup fan-out
+
+- **WHEN** a function holds `var wg sync.WaitGroup; for _, grant := range grants { wg.Go(func() { ... }) }; wg.Wait()`
+- **THEN** the analyzer reports the `wg.Go` call, and reports nothing when `sem <- struct{}{}` precedes `wg.Go` in the loop body
 
 #### Scenario: A goroutine in a constructor without Stop
 
@@ -131,7 +146,7 @@ For `notfoundguard`, the error test of a statement is the innermost enclosing `i
 
 #### Scenario: A lifecycle and a join
 
-- **WHEN** `func (b *Broker) Start(ctx context.Context)` holds `go b.run()` and `Broker` has a `Stop` method, and another function holds `var wg sync.WaitGroup; go func() { defer wg.Done(); ... }(); wg.Wait()`
+- **WHEN** `func (b *Broker) Start(ctx context.Context)` holds `go b.run()` and `Broker` has a `Stop` method, and another function holds `var wg sync.WaitGroup; go func() { defer wg.Done(); ... }(); wg.Wait()` outside a loop
 - **THEN** the analyzer reports neither `go` statement
 
 ### Requirement: detachedctx reports a request context in a cleanup
@@ -164,7 +179,7 @@ For `notfoundguard`, the error test of a statement is the innermost enclosing `i
 
 ### Requirement: rawhttp reports a raw HTTP client and a raw body read outside the approved packages
 
-`rawhttp` SHALL report a composite literal of type `net/http.Client` in a package whose import path starts with no entry of the setting `client-packages`. It SHALL report a call of `json.NewDecoder` or `io.ReadAll` whose argument is the field `Body` of a `*net/http.Request`, in a package whose import path starts with no entry of the setting `body-packages`.
+`rawhttp` SHALL report a value of type `net/http.Client` that a package makes (a composite literal, `new(http.Client)`, or a `var` declaration of type `http.Client` with no value) in a package whose import path starts with no entry of the setting `client-packages`. It SHALL report a use of the field `Body` of a `net/http.Request` that can read the body, in a package whose import path starts with no entry of the setting `body-packages`. An assignment to the field, a call of its `Close` method, a comparison with `nil` and an argument of `http.MaxBytesReader` SHALL NOT count as a read. It SHALL leave alone the `Body` of a `net/http.Response`.
 
 #### Scenario: A client outside the approved package
 
@@ -176,14 +191,19 @@ For `notfoundguard`, the error test of a statement is the innermost enclosing `i
 - **WHEN** `body-packages` holds `<module>/handler/request`, and `handler/v1/billing/webhook.go` holds `io.ReadAll(r.Body)`
 - **THEN** the analyzer reports the call, and reports nothing for `json.NewDecoder(r.Body)` in `handler/request/decode.go`
 
+#### Scenario: A body read through a wrapper
+
+- **WHEN** `handler/v1/billing/webhook.go` holds `io.ReadAll(io.LimitReader(r.Body, n))`, `body := r.Body` and `defer r.Body.Close()`
+- **THEN** the analyzer reports the first two uses of `r.Body` and not the `Close` call
+
 ### Requirement: anyapi reports any in an exported API
 
-`anyapi` SHALL report an exported function or method whose parameter or result has the type `any` or `map[string]any`, an exported method of the method set of an exported interface type (also a method that an embedded interface of the same module gives it, and not a method of an embedded interface from another module, whose signature the repository cannot change) with such a parameter or result, and an exported field of an exported struct type with such a type. It SHALL leave alone a variadic `...any` parameter, an unexported function, method, type or field, a named type whose underlying type is a map, and a method named in the setting `exempt-methods` (default `Scan`).
+For `anyapi`, an any shape is `any`, `map[string]any` or `[]any`, or a named type whose underlying type is one of these and that the setting `allow-types` (a list of `<import path>.<name>`) does not name. `anyapi` SHALL report an exported function or method whose parameter or result has an any shape, an exported method of the method set of an exported interface type (also a method that an embedded interface of the same module gives it, and not a method of an embedded interface from another module, whose signature the repository cannot change) with such a parameter or result, and an exported field of an exported struct type with such a type. It SHALL leave alone a variadic `...any` parameter, an unexported function, method, type or field, a named type of `allow-types`, and a method named in the setting `exempt-methods` (default `Scan`). The message SHALL ask for a struct, or a named type with typed fields.
 
 #### Scenario: A map field
 
-- **WHEN** an exported struct declares `Conditions map[string]any` and another declares `Metadata types.JSONMap`
-- **THEN** the analyzer reports the first field and not the second
+- **WHEN** an exported struct declares `Conditions map[string]any`, `Metadata JSONMap` with `type JSONMap map[string]any`, and `Items []any`
+- **THEN** the analyzer reports each field, and reports nothing for `Metadata` when `allow-types` names `JSONMap`
 
 #### Scenario: A log-style variadic
 

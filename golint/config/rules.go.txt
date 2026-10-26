@@ -12,3 +12,13 @@ func floatSum(m dsl.Matcher) {
 		Where(m.File().Imports(`github.com/shopspring/decimal`)).
 		Report(`the float sum loses precision before the conversion: convert each operand, then add the decimals`)
 }
+
+func emptyEnumDefault(m dsl.Matcher) {
+	m.Match(
+		`switch $x { $*_; default: }`, `switch $*_; $x { $*_; default: }`,
+		`switch $x { $*_; default: break }`, `switch $*_; $x { $*_; default: break }`,
+	).
+		Where((m["x"].Type.Underlying().OfKind("integer") && !m["x"].Type.OfKind("integer")) ||
+			(m["x"].Type.Underlying().Is(`string`) && !m["x"].Type.Is(`string`))).
+		Report(`an empty default turns off the exhaustive check of this enum switch: panic or return an error in the default, or remove the default`)
+}

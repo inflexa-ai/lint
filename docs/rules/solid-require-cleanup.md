@@ -4,7 +4,7 @@ This document is for the rule `@inflexa-ai/solid/require-cleanup`. Pair each sub
 
 ## Why
 
-A listener or a timer stays alive after the component that started it stops. Solid does not end it when it disposes of the owner of the component. The handler then runs for a component that no longer exists, and each new copy of the component adds one more handler.
+A listener stays alive after the component that started it stops. Solid does not end it when it disposes of the owner of the component. The handler then runs for a component that no longer exists, and each new copy of the component adds one more handler.
 
 `onCleanup` in the body of the component runs when Solid disposes of the owner. It is the place that ends the subscription.
 
@@ -13,7 +13,7 @@ A listener or a timer stays alive after the component that started it stops. Sol
 A subscription call in the body of a component, when no `onCleanup` call of solid-js is in the same body.
 
 - A component is a function whose name starts with an uppercase letter, or a function that returns JSX. The name is the name of the function or the name of the variable that the function initializes. The rule `prefer-onSettled-for-side-effects` of `eslint-plugin-solid` uses a similar check, but it reads only the own name of a named function.
-- A subscription call is a call of a member named `on`, a call of `addEventListener`, or a call of `setInterval`. The global and the member forms of `addEventListener` and `setInterval` are subscriptions.
+- A subscription call is a call of a member named `on`, or a call of `addEventListener`. The global and the member forms of `addEventListener` are subscriptions.
 - An `onCleanup` call is a call of the named import `onCleanup` of `solid-js`, also under a different local name. A call of `onCleanup` on the namespace import of `solid-js` is also an `onCleanup` call.
 
 A component that is nested in a different component is a component of its own. For example, a render callback of `<For>` that returns JSX must have its own `onCleanup`.
@@ -23,7 +23,8 @@ A component that is nested in a different component is a component of its own. F
 - A subscription in a nested function that is not a component, for example an effect, an `onMount` callback, a `ref` callback or an event handler. An effect runs again and must have its own cleanup. An element owns the listeners of its `ref` callback. An event handler runs with no owner. The rule does not examine these functions.
 - A subscription in a hook or in a different function that is not a component.
 - A subscription at module scope.
-- A call of a local binding named `setInterval` or `addEventListener`, for example a parameter or an import.
+- A call of a local binding named `addEventListener`, for example a parameter or an import.
+- A timer, for example `setInterval`. The timer ban of `typescript()` owns timers.
 - A call of `on` on the namespace import of `solid-js`, as in `Solid.on(count, log)`. That `on` is the helper of Solid that makes a tracked callback, not a subscription.
 
 ## Limits
@@ -36,7 +37,7 @@ The rule reads no types. A call of a member named `on` that is not a subscriptio
 
 ## The timer ban of typescript()
 
-`typescript()` bans each raw timer by default, and `solid()` keeps the ban. Thus a `setInterval` in a component gets a report from `eslint-js/no-restricted-syntax`, also when an `onCleanup` ends it. To let a component use a timer, a repository sets `syntax: { timers: false }`. A repository can also turn the ban off in its own blocks for the files of its components.
+`typescript()` bans each raw timer by default, and `solid()` keeps the ban. Thus `eslint-js/no-restricted-syntax` reports a `setInterval` in a component, also when an `onCleanup` ends it. This rule does not report a timer, thus the two rules do not give two different fixes for one call. To let a component use a timer, a repository sets `syntax: { timers: false }`. Then, end the timer in an `onCleanup`, because this rule does not ask for it. A repository can also turn the ban off in its own blocks for the files of its components.
 
 ## Options
 

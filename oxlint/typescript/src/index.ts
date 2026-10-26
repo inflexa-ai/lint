@@ -27,6 +27,22 @@ export type Ban = false | { hint?: string }
 /** The syntax bans, each on unless a repository switches it off. */
 export type SyntaxBans = { forEach?: Ban; jsonParse?: Ban; timers?: Ban; regex?: Ban }
 
+/**
+ * The spellings of the member `JSON.parse`: the object bare or qualified, as in
+ * `globalThis.JSON`, and each name plain or computed, as in `JSON['parse']`.
+ */
+const JSON_PARSE_MEMBERS = [
+  ["object.name='JSON'", "property.name='parse'"],
+  ["object.property.name='JSON'", "property.name='parse'"],
+  ["object.name='JSON'", "property.value='parse'"],
+  ["object.property.name='JSON'", "property.value='parse'"],
+  ["object.property.value='JSON'", "property.name='parse'"],
+  ["object.property.value='JSON'", "property.value='parse'"],
+]
+
+/** A call of a zod parse method, whose argument is the value that the schema proves. */
+const SCHEMA_PARSE = 'CallExpression[callee.property.name=/^(parse|safeParse|parseAsync|safeParseAsync)$/]'
+
 /** One entry of `eslint-js/no-restricted-syntax`. */
 export type RestrictedSyntax = { selector: string; message: string }
 
@@ -49,21 +65,20 @@ export function restrictedSyntax({ forEach = {}, jsonParse = {}, timers = {}, re
       selector: "CallExpression[callee.property.name='forEach']",
       message:
         withHint(
-          '`forEach` hides what the loop is for and cannot `break`, `continue` or `await`. Use `for...of` for a side effect, and `map`, `filter` or `reduce` for a value.',
+          '`forEach` hides what the loop is for and cannot `break`, `continue` or `await`. Use `for...of` for a side effect, `map`, `filter` or `reduce` for a value, and a queue of fixed width for an async call on each element.',
           forEach.hint,
         ) + ` A call that neither replaces ${DISABLE}`,
     },
     jsonParse: jsonParse && {
-      selector: [
-        "CallExpression[callee.object.name='JSON'][callee.property.name='parse']",
-        "CallExpression[callee.object.property.name='JSON'][callee.property.name='parse']",
-        "CallExpression[callee.object.name='JSON'][callee.property.value='parse']",
-        "CallExpression[callee.object.property.name='JSON'][callee.property.value='parse']",
-        "CallExpression[callee.object.property.value='JSON'][callee.property.name='parse']",
-        "CallExpression[callee.object.property.value='JSON'][callee.property.value='parse']",
-      ].join(', '),
+      selector: JSON_PARSE_MEMBERS.flatMap(([object, property]) => [
+        // A schema that parses the result directly is the form that the message asks for.
+        `CallExpression[callee.${object}][callee.${property}]:not(${SCHEMA_PARSE} > *)`,
+        // The method passed on uncalled, as in `z.string().transform(JSON.parse)`.
+        `MemberExpression[${object}][${property}]:not(CallExpression > MemberExpression.callee)`,
+      ]).join(', '),
       message:
-        withHint('`JSON.parse` gives back `any` and proves nothing about it. Parse the value with a schema.', jsonParse.hint) + ` A parse that cannot take a schema ${DISABLE}`,
+        withHint('`JSON.parse` gives back `any` and proves nothing about it. Hand its result straight to a schema: `Settings.parse(JSON.parse(text))`.', jsonParse.hint) +
+        ` A parse that cannot take a schema ${DISABLE}`,
     },
     timers: timers && {
       selector: [
@@ -85,6 +100,9 @@ export function restrictedSyntax({ forEach = {}, jsonParse = {}, timers = {}, re
         "CallExpression[callee.property.name='RegExp']",
         "NewExpression[callee.property.value='RegExp']",
         "CallExpression[callee.property.value='RegExp']",
+        // `match`, `matchAll` and `search` turn a string argument into a `RegExp`.
+        "CallExpression[callee.property.name=/^(match|matchAll|search)$/][arguments.0.type='Literal'][arguments.0.value=type(string)]",
+        "CallExpression[callee.property.name=/^(match|matchAll|search)$/][arguments.0.type='TemplateLiteral']",
       ].join(', '),
       message:
         withHint(
@@ -163,6 +181,8 @@ export type TypescriptOptions = {
   restrictedImports?: { group: string[]; message: string }[]
   /** Patterns of the files that can turn a thrown value into an `Error`. */
   instanceofErrorAllowIn?: string[]
+  /** The queue of fixed width that the repository offers, which the message about an unbounded `Promise.all` names. */
+  queueHint?: string
   /** The package scopes and the workspace folders of the repository. */
   packages?: { scopes?: string[]; workspaces?: string[] }
   /**
@@ -195,13 +215,14 @@ export function typescript({
   syntax = {},
   restrictedImports = [],
   instanceofErrorAllowIn = [],
+  queueHint,
   packages = {},
   overrides = [],
 }: TypescriptOptions = {}): OxlintConfig {
   const bans = Object.values(restrictedSyntax(syntax)).filter((ban) => ban !== false)
 
   return {
-    plugins: ['eslint', 'typescript'],
+    plugins: ['eslint', 'typescript', 'oxc', 'unicorn'],
     // Absolute paths, because oxlint resolves a package name from the
     // configuration of the repository, which does not depend on these plugins.
     jsPlugins: [
@@ -272,6 +293,20 @@ export function typescript({
           // SAFETY comment. no-double-cast and no-unsafe-type-assertion already
           // refuse the dangerous forms.
           [`${NAMESPACE}/require-assertion-safety`]: 'error',
+          // The native rules of the `perf` category whose fix keeps the code
+          // immutable and the work bounded. `no-map-spread` asks to mutate the
+          // element of a callback in place, thus it stays off.
+          // `no-await-in-loop` asks for a `Promise.all`, and
+          // `no-unbounded-promise-all` then asks for a queue of fixed width. A
+          // loop whose order matters carries a directive with the reason.
+          'no-await-in-loop': 'error',
+          [`${NAMESPACE}/no-unbounded-promise-all`]: ['error', queueHint === undefined ? {} : { hint: queueHint }],
+          'oxc/no-accumulating-spread': 'error',
+          [`${NAMESPACE}/no-accumulating-copy`]: 'error',
+          'unicorn/prefer-set-has': 'error',
+          'unicorn/prefer-array-find': 'error',
+          'unicorn/prefer-array-flat-map': 'error',
+          'no-useless-call': 'error',
           'eslint-js/no-restricted-syntax': bans.length > 0 ? ['error', ...bans] : 'off',
           'no-restricted-imports': restrictedImports.length > 0 ? ['error', { patterns: restrictedImports }] : 'off',
         },
@@ -286,6 +321,9 @@ export function typescript({
           [`${NAMESPACE}/test-placement`]: 'error',
           // A test helper has its callers in the same file.
           'typescript/explicit-function-return-type': 'off',
+          // A test sets up its fixtures one after the other, so that a failure
+          // points to one step, and the code fixes the size of each input.
+          'no-await-in-loop': 'off',
         },
       },
       ...overrides,

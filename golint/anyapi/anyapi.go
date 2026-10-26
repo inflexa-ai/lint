@@ -1,4 +1,4 @@
-// Package anyapi reports any and map[string]any in an exported API.
+// Package anyapi reports any, map[string]any and []any in an exported API.
 package anyapi
 
 import (
@@ -17,15 +17,18 @@ const (
 	url  = "https://github.com/inflexa-ai/lint/blob/main/docs/rules/anyapi.md"
 	doc  = `give an exported API a type that states its shape
 
-An exported parameter, result or field of type any or map[string]any tells
-the caller nothing, and each caller must guess and check the content. Use a
-struct, or a named type that states the shape.`
+An exported parameter, result or field of type any, map[string]any or []any,
+or of a named type with one of these underlying types, tells the caller
+nothing, and each caller must guess and check the content. Use a struct, or a
+named type with typed fields.`
 )
 
 // Settings configures the analyzer. A nil ExemptMethods gives the default; an
-// empty list gives an empty set.
+// empty list gives an empty set. AllowTypes holds named types in the form
+// import/path.Name.
 type Settings struct {
 	ExemptMethods []string `json:"exempt-methods"`
+	AllowTypes    []string `json:"allow-types"`
 }
 
 func New(s Settings) *analysis.Analyzer {
@@ -33,13 +36,14 @@ func New(s Settings) *analysis.Analyzer {
 	if exempt == nil {
 		exempt = []string{"Scan"}
 	}
+	allow := append([]string(nil), s.AllowTypes...)
 	return &analysis.Analyzer{
 		Name:     name,
 		Doc:      doc,
 		URL:      url,
 		Requires: []*analysis.Analyzer{inspect.Analyzer},
 		Run: func(pass *analysis.Pass) (any, error) {
-			run(pass, exempt)
+			run(pass, exempt, allow)
 			return nil, nil
 		},
 	}
@@ -47,18 +51,15 @@ func New(s Settings) *analysis.Analyzer {
 
 var Analyzer = New(Settings{})
 
-func run(pass *analysis.Pass, exempt []string) {
+func run(pass *analysis.Pass, exempt, allow []string) {
 	// inspect.Analyzer is in Requires, and its result is always an *inspector.Inspector.
 	insp := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
+	isAnyShape := func(t types.Type) bool { return shape(t, allow) != "" }
 	report := func(node ast.Node, subject string, t types.Type) {
-		shape := "map[string]any"
-		if isAny(t) {
-			shape = "any"
-		}
 		pass.Report(analysis.Diagnostic{
 			Pos:     node.Pos(),
 			End:     node.End(),
-			Message: subject + " exposes " + shape + " in an exported API: use a struct or a named type that states the shape",
+			Message: subject + " exposes " + shape(t, allow) + " in an exported API: use a struct, or a named type with typed fields",
 			URL:     url,
 		})
 	}
@@ -251,16 +252,33 @@ func exportedReceiver(recv *ast.FieldList) bool {
 	}
 }
 
-func isAnyShape(t types.Type) bool {
-	if isAny(t) {
-		return true
+// shape returns any, map[string]any or []any when t or the underlying type of
+// a named t has that shape, and "" otherwise. A named type of allow has no
+// shape.
+func shape(t types.Type, allow []string) string {
+	t = types.Unalias(t)
+	if named, ok := t.(*types.Named); ok {
+		obj := named.Obj()
+		if obj.Pkg() != nil && slices.Contains(allow, obj.Pkg().Path()+"."+obj.Name()) {
+			return ""
+		}
+		t = named.Underlying()
 	}
-	m, ok := types.Unalias(t).(*types.Map)
-	if !ok {
-		return false
+	switch t := t.(type) {
+	case *types.Interface:
+		if t.Empty() {
+			return "any"
+		}
+	case *types.Map:
+		if key, ok := types.Unalias(t.Key()).(*types.Basic); ok && key.Kind() == types.String && isAny(t.Elem()) {
+			return "map[string]any"
+		}
+	case *types.Slice:
+		if isAny(t.Elem()) {
+			return "[]any"
+		}
 	}
-	key, ok := types.Unalias(m.Key()).(*types.Basic)
-	return ok && key.Kind() == types.String && isAny(m.Elem())
+	return ""
 }
 
 func isAny(t types.Type) bool {

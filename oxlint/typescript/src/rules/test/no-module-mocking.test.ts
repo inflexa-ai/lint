@@ -8,6 +8,9 @@ createRuleTester().run('no-module-mocking', noModuleMocking, {
     // Other framework calls stand a dependency up without swapping a module.
     `import { vi } from 'vitest'\nconst fetch = vi.fn()`,
     `import { vi } from 'vitest'\nvi.spyOn(clock, 'now')`,
+    // A spy on an object the test built, or on a named import, swaps nothing under the code.
+    `import { vi } from 'vitest'\nimport { store } from './store'\nvi.spyOn(store, 'save')`,
+    `import { vi } from 'vitest'\nconst globalThis = makeScope()\nvi.spyOn(globalThis, 'fetch')`,
     // A binding of one's own that happens to be named vi is not the framework.
     `const vi = { mock() {} }\nvi.mock('../db')`,
     // jest imported from elsewhere is not the framework object.
@@ -24,6 +27,13 @@ createRuleTester().run('no-module-mocking', noModuleMocking, {
     `import * as b from 'bun:test'\nb.vi.mock('../db')`,
   ],
   invalid: [
+    {
+      code: `import { vi } from 'vitest'\nimport * as db from '../db'\nvi.spyOn(db, 'query')`,
+      errors: [{ messageId: 'namespaceSpy' as const, data: { call: 'vi.spyOn', namespace: 'db' } }],
+    },
+    { code: `import { vi } from 'vitest'\nvi.stubGlobal('fetch', fake)`, errors: [{ messageId: 'globalStub' as const, data: { call: 'vi.stubGlobal' } }] },
+    { code: `vi.spyOn(globalThis, 'fetch')`, errors: [{ messageId: 'globalStub' as const, data: { call: 'vi.spyOn' } }] },
+    { code: `import { jest } from '@jest/globals'\njest.spyOn(window, 'setTimeout')`, errors: [{ messageId: 'globalStub' as const, data: { call: 'jest.spyOn' } }] },
     { code: `import { vi } from 'vitest'\nvi.mock('../db')`, errors: [moduleMock('vi.mock')] },
     { code: `import { vi } from 'vitest'\nvi.doMock('../db', () => ({}))`, errors: [moduleMock('vi.doMock')] },
     { code: `import { vi } from 'vitest'\nvi.unstable_mockModule('../db', () => ({}))`, errors: [moduleMock('vi.unstable_mockModule')] },

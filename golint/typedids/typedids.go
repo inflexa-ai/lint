@@ -65,18 +65,23 @@ func run(pass *analysis.Pass, names []string, qualifier string) {
 			return
 		}
 		for _, field := range fields.List {
-			if !isUUID(pass.TypesInfo.TypeOf(field.Type)) {
+			found, container := uuidIn(pass.TypesInfo.TypeOf(field.Type))
+			if !found {
 				continue
 			}
+			subject := " is a uuid.UUID, but "
+			if container {
+				subject = " holds uuid.UUID values, but "
+			}
 			for _, id := range field.Names {
-				typed := match(id.Name, names)
+				typed := match(id.Name, names, container)
 				if typed == "" {
 					continue
 				}
 				pass.Report(analysis.Diagnostic{
 					Pos: id.Pos(),
 					End: field.Type.End(),
-					Message: id.Name + " is a uuid.UUID, but " + qualifier + typed +
+					Message: id.Name + subject + qualifier + typed +
 						" exists: use the typed ID, so that the compiler rejects an ID of another entity",
 					URL: url,
 				})
@@ -95,15 +100,22 @@ func run(pass *analysis.Pass, names []string, qualifier string) {
 }
 
 // match returns the longest typed ID name that the identifier ends with, in its
-// exported form (RevokedByUserID) or its unexported form (userID).
-func match(ident string, names []string) string {
+// exported form (RevokedByUserID) or its unexported form (userID). For a
+// container the plural form (UserIDs, userIDs) also matches.
+func match(ident string, names []string, container bool) string {
 	best := ""
 	for _, n := range names {
 		if len(n) <= len(best) {
 			continue
 		}
-		if strings.HasSuffix(ident, n) || ident == lowerFirst(n) {
-			best = n
+		forms := []string{n}
+		if container {
+			forms = append(forms, n+"s")
+		}
+		for _, f := range forms {
+			if strings.HasSuffix(ident, f) || ident == lowerFirst(f) {
+				best = n
+			}
 		}
 	}
 	return best
@@ -118,14 +130,24 @@ func lowerFirst(s string) string {
 // the third-party package that came before it.
 var uuidPackages = map[string]bool{"uuid": true, "github.com/google/uuid": true}
 
-func isUUID(t types.Type) bool {
-	if p, ok := types.Unalias(t).(*types.Pointer); ok {
-		t = p.Elem()
+// uuidIn reports whether t is a uuid.UUID, through pointers, slices, arrays
+// and map values, and whether a slice, an array or a map holds it.
+func uuidIn(t types.Type) (found, container bool) {
+	for {
+		switch u := types.Unalias(t).(type) {
+		case *types.Pointer:
+			t = u.Elem()
+		case *types.Slice:
+			t, container = u.Elem(), true
+		case *types.Array:
+			t, container = u.Elem(), true
+		case *types.Map:
+			t, container = u.Elem(), true
+		case *types.Named:
+			obj := u.Obj()
+			return obj.Pkg() != nil && uuidPackages[obj.Pkg().Path()] && obj.Name() == "UUID", container
+		default:
+			return false, false
+		}
 	}
-	named, ok := types.Unalias(t).(*types.Named)
-	if !ok {
-		return false
-	}
-	obj := named.Obj()
-	return obj.Pkg() != nil && uuidPackages[obj.Pkg().Path()] && obj.Name() == "UUID"
 }

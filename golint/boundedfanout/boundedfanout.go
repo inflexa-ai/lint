@@ -4,6 +4,8 @@ package boundedfanout
 
 import (
 	"go/ast"
+	"go/constant"
+	"go/token"
 	"go/types"
 	"slices"
 	"strings"
@@ -20,13 +22,18 @@ const (
 	url  = "https://github.com/inflexa-ai/lint/blob/main/docs/rules/boundedfanout.md"
 	doc  = `bound each fan-out, and give each goroutine a join or a stop
 
-errgroup.Group.Go inside a loop starts one goroutine for each element and
-must have a SetLimit on the group. A go statement outside the approved
-packages must sit in a constructor or a start method of a type with a stop
-method, or in a function that waits on a sync.WaitGroup or an errgroup.Group.
-Otherwise the goroutine outlives its caller with nothing to stop it.`
+A goroutine inside a loop starts one goroutine for each element and must
+have a bound: a SetLimit on the errgroup.Group that is not a constant at or below zero, a
+semaphore acquire before the goroutine, or a loop with a constant count. A go
+statement or a sync.WaitGroup.Go outside the approved packages must sit in a
+constructor or a start method of a type with a stop method, or in a function
+that waits on a sync.WaitGroup or an errgroup.Group. Otherwise the goroutine
+outlives its caller with nothing to stop it.`
 
-	errgroupPath = "golang.org/x/sync/errgroup"
+	errgroupPath    = "golang.org/x/sync/errgroup"
+	semaphorePath   = "golang.org/x/sync/semaphore"
+	loopMessage     = "a goroutine inside a loop starts one goroutine for each element: use an errgroup.Group with SetLimit, or acquire a semaphore before the goroutine"
+	unjoinedMessage = "a goroutine with no join and no stop: wait for it with a bounded errgroup.Group or sync.WaitGroup, or start it from a type with a Stop method"
 )
 
 // Settings configures the analyzer. A nil list gives the default; an empty
@@ -72,37 +79,44 @@ func (c config) run(pass *analysis.Pass) {
 	// inspect.Analyzer is in Requires, and its result is always an *inspector.Inspector.
 	insp := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
 	allowed := slices.ContainsFunc(c.allowed, func(p string) bool { return strings.HasPrefix(pass.Pkg.Path(), p) })
+	report := func(n ast.Node, msg string) {
+		pass.Report(analysis.Diagnostic{Pos: n.Pos(), End: n.End(), Message: msg, URL: url})
+	}
 	for cur := range insp.Root().Preorder((*ast.CallExpr)(nil), (*ast.GoStmt)(nil)) {
-		switch n := cur.Node().(type) {
-		case *ast.CallExpr:
-			if group, ok := groupGo(pass.TypesInfo, n); ok && inLoop(cur) && !hasSetLimit(pass.TypesInfo, enclosingDecl(cur), group) {
-				pass.Report(analysis.Diagnostic{
-					Pos:     n.Pos(),
-					End:     n.End(),
-					Message: "errgroup.Group.Go inside a loop starts one goroutine for each element: call SetLimit on the group before the loop",
-					URL:     url,
-				})
-			}
-		case *ast.GoStmt:
-			if allowed || c.exempt(pass, enclosingDecl(cur)) {
+		if call, ok := cur.Node().(*ast.CallExpr); ok {
+			if group, method, ok := groupGo(pass.TypesInfo, call); ok {
+				if inLoop(cur) && !hasSetLimit(pass.TypesInfo, enclosingDecl(cur), group) && !bounded(pass.TypesInfo, cur) {
+					report(call, "errgroup.Group."+method+" inside a loop starts one goroutine for each element: call SetLimit on the group before the loop, with a width above zero")
+				}
 				continue
 			}
-			pass.Report(analysis.Diagnostic{
-				Pos:     n.Pos(),
-				End:     n.End(),
-				Message: "a goroutine with no join and no stop: wait for it with a sync.WaitGroup or an errgroup.Group, or start it from a type with a Stop method",
-				URL:     url,
-			})
+			if !isMethod(pass.TypesInfo, call, "sync", "WaitGroup", "Go") {
+				continue
+			}
+		}
+		if allowed {
+			continue
+		}
+		if inLoop(cur) && !bounded(pass.TypesInfo, cur) {
+			report(cur.Node(), loopMessage)
+		}
+		if !c.exempt(pass, enclosingDecl(cur)) {
+			report(cur.Node(), unjoinedMessage)
 		}
 	}
 }
 
-func groupGo(info *types.Info, call *ast.CallExpr) (ast.Expr, bool) {
+func groupGo(info *types.Info, call *ast.CallExpr) (ast.Expr, string, bool) {
 	sel, ok := call.Fun.(*ast.SelectorExpr)
-	if !ok || !isMethod(info, call, errgroupPath, "Group", "Go") {
-		return nil, false
+	if !ok {
+		return nil, "", false
 	}
-	return sel.X, true
+	for _, method := range []string{"Go", "TryGo"} {
+		if isMethod(info, call, errgroupPath, "Group", method) {
+			return sel.X, method, true
+		}
+	}
+	return nil, "", false
 }
 
 func isMethod(info *types.Info, call *ast.CallExpr, pkg, typ, method string) bool {
@@ -122,20 +136,86 @@ func isNamed(t types.Type, pkg, typ string) bool {
 	return ok && named.Obj().Pkg() != nil && named.Obj().Pkg().Path() == pkg && named.Obj().Name() == typ
 }
 
-// inLoop reports whether the body of a for or range statement of the same
-// function declaration encloses the cursor, through any function literal.
 func inLoop(cur inspector.Cursor) bool {
+	return len(loops(cur)) > 0
+}
+
+// loops returns the for and range statements of the same function
+// declaration whose body encloses the cursor, through any function literal,
+// the innermost first.
+func loops(cur inspector.Cursor) []ast.Stmt {
+	var out []ast.Stmt
 	for ; cur.Node() != nil; cur = cur.Parent() {
 		switch cur.Node().(type) {
 		case *ast.FuncDecl, *ast.File:
-			return false
+			return out
 		}
 		switch cur.ParentEdgeKind() {
 		case edge.ForStmt_Body, edge.RangeStmt_Body:
-			return true
+			// The parent of a for body or a range body is a for or range statement.
+			out = append(out, cur.Parent().Node().(ast.Stmt))
 		}
 	}
+	return out
+}
+
+// bounded reports whether each enclosing loop has a constant count, or the
+// innermost loop acquires a semaphore before the goroutine.
+func bounded(info *types.Info, cur inspector.Cursor) bool {
+	ls := loops(cur)
+	if len(ls) == 0 {
+		return true
+	}
+	if !slices.ContainsFunc(ls, func(l ast.Stmt) bool { return !constantCount(info, l) }) {
+		return true
+	}
+	var body *ast.BlockStmt
+	switch l := ls[0].(type) {
+	case *ast.ForStmt:
+		body = l.Body
+	case *ast.RangeStmt:
+		body = l.Body
+	}
+	return acquires(info, body, cur.Node())
+}
+
+func constantCount(info *types.Info, loop ast.Stmt) bool {
+	switch l := loop.(type) {
+	case *ast.RangeStmt:
+		return isConstInt(info, l.X)
+	case *ast.ForStmt:
+		cond, ok := l.Cond.(*ast.BinaryExpr)
+		return ok && (cond.Op == token.LSS || cond.Op == token.LEQ) && isConstInt(info, cond.Y)
+	}
 	return false
+}
+
+func isConstInt(info *types.Info, x ast.Expr) bool {
+	tv, ok := info.Types[x]
+	return ok && tv.Value != nil && tv.Value.Kind() == constant.Int
+}
+
+// acquires reports whether the body sends on a channel or acquires a
+// semaphore.Weighted before the spawn. A function literal counts only when it
+// encloses the spawn, because an acquire inside the goroutine does not stop
+// the loop from starting it.
+func acquires(info *types.Info, body *ast.BlockStmt, spawn ast.Node) bool {
+	found := false
+	ast.Inspect(body, func(n ast.Node) bool {
+		if found || n == nil || n.Pos() >= spawn.Pos() {
+			return false
+		}
+		switch n := n.(type) {
+		case *ast.FuncLit:
+			return n.End() >= spawn.End()
+		case *ast.SendStmt:
+			found = true
+		case *ast.CallExpr:
+			found = isMethod(info, n, semaphorePath, "Weighted", "Acquire") || isMethod(info, n, semaphorePath, "Weighted", "TryAcquire")
+		}
+		return !found
+	})
+	return found
 }
 
 func enclosingDecl(cur inspector.Cursor) *ast.FuncDecl {
@@ -156,11 +236,19 @@ func hasSetLimit(info *types.Info, decl *ast.FuncDecl, group ast.Expr) bool {
 			return !found
 		}
 		if sel, ok := call.Fun.(*ast.SelectorExpr); ok && isMethod(info, call, errgroupPath, "Group", "SetLimit") && sameObject(info, sel.X, group) {
-			found = true
+			found = limits(info, call.Args[0])
 		}
 		return true
 	})
 	return found
+}
+
+// limits reports whether SetLimit(x) bounds the group. A negative value
+// removes the limit and zero blocks each Go, so a constant must be above zero.
+// A width that the code computes, such as runtime.NumCPU(), counts as a bound.
+func limits(info *types.Info, x ast.Expr) bool {
+	tv, ok := info.Types[x]
+	return !ok || tv.Value == nil || constant.Sign(tv.Value) > 0
 }
 
 // sameObject reports whether two expressions name the same group. For a

@@ -4,12 +4,14 @@ package rawhttp
 
 import (
 	"go/ast"
+	"go/token"
 	"go/types"
 	"slices"
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/inspect"
+	"golang.org/x/tools/go/ast/edge"
 	"golang.org/x/tools/go/ast/inspector"
 	"golang.org/x/tools/go/types/typeutil"
 )
@@ -55,19 +57,30 @@ func run(pass *analysis.Pass, clients, bodies []string) {
 	checkBodies := !slices.ContainsFunc(bodies, under)
 	// inspect.Analyzer is in Requires, and its result is always an *inspector.Inspector.
 	insp := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	for cur := range insp.Root().Preorder((*ast.CompositeLit)(nil), (*ast.CallExpr)(nil)) {
+	reportClient := func(n ast.Node) {
+		pass.Report(analysis.Diagnostic{
+			Pos:     n.Pos(),
+			End:     n.End(),
+			Message: "build the HTTP client in an approved client package, so that each call gets its timeout, tracing and error handling",
+			URL:     url,
+		})
+	}
+	for cur := range insp.Root().Preorder((*ast.CompositeLit)(nil), (*ast.CallExpr)(nil), (*ast.ValueSpec)(nil), (*ast.SelectorExpr)(nil)) {
 		switch n := cur.Node().(type) {
 		case *ast.CompositeLit:
-			if checkClients && isNamed(pass.TypesInfo.TypeOf(n), "net/http", "Client") {
-				pass.Report(analysis.Diagnostic{
-					Pos:     n.Pos(),
-					End:     n.End(),
-					Message: "build the HTTP client in an approved client package, so that each call gets its timeout, tracing and error handling",
-					URL:     url,
-				})
+			if checkClients && isClient(pass.TypesInfo.TypeOf(n)) {
+				reportClient(n)
 			}
 		case *ast.CallExpr:
-			if checkBodies && readsRequestBody(pass.TypesInfo, n) {
+			if checkClients && isBuiltin(pass.TypesInfo, n.Fun, "new") && len(n.Args) == 1 && isClient(pass.TypesInfo.TypeOf(n.Args[0])) {
+				reportClient(n)
+			}
+		case *ast.ValueSpec:
+			if checkClients && n.Type != nil && len(n.Values) == 0 && isClient(pass.TypesInfo.TypeOf(n.Type)) {
+				reportClient(n)
+			}
+		case *ast.SelectorExpr:
+			if checkBodies && isRequestBody(pass.TypesInfo, n) && readsBody(pass.TypesInfo, cur) {
 				pass.Report(analysis.Diagnostic{
 					Pos:     n.Pos(),
 					End:     n.End(),
@@ -79,18 +92,48 @@ func run(pass *analysis.Pass, clients, bodies []string) {
 	}
 }
 
-func readsRequestBody(info *types.Info, call *ast.CallExpr) bool {
-	fn := typeutil.StaticCallee(info, call)
-	if fn == nil || fn.Pkg() == nil || len(call.Args) != 1 {
+func isClient(t types.Type) bool {
+	named, ok := types.Unalias(t).(*types.Named)
+	return ok && named.Obj().Pkg() != nil && named.Obj().Pkg().Path() == "net/http" && named.Obj().Name() == "Client"
+}
+
+func isBuiltin(info *types.Info, fun ast.Expr, name string) bool {
+	id, ok := ast.Unparen(fun).(*ast.Ident)
+	if !ok {
 		return false
 	}
-	switch fn.Pkg().Path() + "." + fn.Name() {
-	case "encoding/json.NewDecoder", "io.ReadAll":
-	default:
-		return false
+	b, ok := info.Uses[id].(*types.Builtin)
+	return ok && b.Name() == name
+}
+
+func isRequestBody(info *types.Info, sel *ast.SelectorExpr) bool {
+	s, ok := info.Selections[sel]
+	return ok && s.Kind() == types.FieldVal && sel.Sel.Name == "Body" && isNamed(info.TypeOf(sel.X), "net/http", "Request")
+}
+
+// readsBody reports whether the use of the body can read it. A write of the
+// field, a Close, a nil test and the argument of http.MaxBytesReader do not
+// read it.
+func readsBody(info *types.Info, cur inspector.Cursor) bool {
+	for cur.ParentEdgeKind() == edge.ParenExpr_X {
+		cur = cur.Parent()
 	}
-	sel, ok := ast.Unparen(call.Args[0]).(*ast.SelectorExpr)
-	return ok && sel.Sel.Name == "Body" && isNamed(info.TypeOf(sel.X), "net/http", "Request")
+	switch parent := cur.Parent().Node().(type) {
+	case *ast.AssignStmt:
+		return cur.ParentEdgeKind() != edge.AssignStmt_Lhs
+	case *ast.SelectorExpr:
+		return parent.Sel.Name != "Close"
+	case *ast.BinaryExpr:
+		other := parent.X
+		if cur.ParentEdgeKind() == edge.BinaryExpr_X {
+			other = parent.Y
+		}
+		return !((parent.Op == token.EQL || parent.Op == token.NEQ) && info.Types[other].IsNil())
+	case *ast.CallExpr:
+		fn := typeutil.StaticCallee(info, parent)
+		return fn == nil || fn.Pkg() == nil || fn.Pkg().Path()+"."+fn.Name() != "net/http.MaxBytesReader"
+	}
+	return true
 }
 
 func isNamed(t types.Type, pkg, typ string) bool {

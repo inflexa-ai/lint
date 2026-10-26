@@ -21,6 +21,11 @@ ruleTester.run('no-unknown-type-guards', noUnknownTypeGuards, {
     `type Guard<T> = (value: unknown) => value is T`,
     // A function with no return type makes no claim.
     `function check(value: unknown) { return value != null }`,
+    // The call gives a callback guard the type of its parameter.
+    `const foos = parts.filter((part): part is Foo => part.kind === 'foo')`,
+    `const foo = parts.find(function (part): part is Foo { return part.kind === 'foo' })`,
+    // A dictionary with a parsed value type is a known type.
+    `function isAdmin(roles: Record<string, Role>): roles is Record<string, AdminRole> { return true }`,
   ],
   invalid: [
     {
@@ -48,6 +53,14 @@ ruleTester.run('no-unknown-type-guards', noUnknownTypeGuards, {
       errors: [unknownGuard('isUser')],
     },
     { code: `export default (value: unknown): value is User => true`, errors: [unknownGuard('This function')] },
+    // A wide type that is not `unknown` carries the same hole.
+    { code: `function isUser(value: object): value is User { return 'id' in value }`, errors: [unknownGuard('isUser')] },
+    { code: `function isUser(value: {}): value is User { return true }`, errors: [unknownGuard('isUser')] },
+    { code: `function isUser(value: Record<string, unknown>): value is User { return true }`, errors: [unknownGuard('isUser')] },
+    { code: `function isUser(value: Readonly<Record<string, any>>): value is User { return true }`, errors: [unknownGuard('isUser')] },
+    { code: `function isUser(value: User | unknown): value is User { return true }`, errors: [unknownGuard('isUser')] },
+    // A callback that is not a call argument has no type from a context.
+    { code: `const isUser = (value): value is User => true`, errors: [unknownGuard('isUser')] },
   ],
 })
 
@@ -59,6 +72,11 @@ ruleTester.run('no-typeof-object', noTypeofObject, {
     `if (typeof window === 'undefined') return`,
     `const kind = typeof value`,
     `if (value === 'object') use(value)`,
+    `let kind = typeof value\nkind = 'string'\nif (kind === 'object') use(kind)`,
+    `switch (typeof value) { case 'string': use(value) }`,
+    `if (value instanceof ObjectId) use(value)`,
+    `const Object = make()\nif (value instanceof Object) use(value)`,
+    `if (Object(left) === right) use(left)`,
   ],
   invalid: [
     { code: `if (typeof parsed === 'object' && parsed !== null) use(parsed)`, errors: [{ messageId: 'typeofObject' as const, data: { operator: '===' } }] },
@@ -66,6 +84,13 @@ ruleTester.run('no-typeof-object', noTypeofObject, {
     { code: `if ('object' === typeof parsed) use(parsed)`, errors: [{ messageId: 'typeofObject' as const, data: { operator: '===' } }] },
     { code: `if (typeof parsed == "object") use(parsed)`, errors: [{ messageId: 'typeofObject' as const, data: { operator: '==' } }] },
     { code: `const ok = typeof body.data === 'object'`, errors: [{ messageId: 'typeofObject' as const }] },
+    { code: `const kind = typeof value\nif (kind === 'object') use(value)`, errors: [{ messageId: 'typeofObject' as const, data: { operator: '===' } }] },
+    {
+      code: `switch (typeof value) { case 'string': break\n case 'object': use(value) }`,
+      errors: [{ messageId: 'objectProbe' as const, data: { form: "case 'object'" } }],
+    },
+    { code: `if (value instanceof Object) use(value)`, errors: [{ messageId: 'objectProbe' as const, data: { form: 'instanceof Object' } }] },
+    { code: `if (Object(options) !== options) throw new Error('bad')`, errors: [{ messageId: 'objectProbe' as const, data: { form: 'Object(value) !== value' } }] },
   ],
 })
 
@@ -119,6 +144,9 @@ ruleTester.run('no-instanceof-error', noInstanceofError, {
     { code: `if (Error['isError'](thrown)) log(thrown.stack)`, errors: [errorCheck('Error.isError')] },
     { code: `if (Error.isError?.(thrown)) log(thrown.stack)`, errors: [errorCheck('Error.isError')] },
     { code: `const message = Error.isError(error) ? error.message : 'failed'`, errors: [errorCheck('Error.isError')] },
+    { code: `if (Error.prototype.isPrototypeOf(cause)) log(cause)`, errors: [errorCheck('Error.prototype.isPrototypeOf')] },
+    { code: `if (Object.prototype.isPrototypeOf.call(Error.prototype, cause)) log(cause)`, errors: [errorCheck('Error.prototype.isPrototypeOf')] },
+    { code: `const parsed = z.instanceof(Error).safeParse(cause)`, errors: [errorCheck('instanceof(Error)')] },
     {
       filename: 'apps/lumen/src/modules/files/upload.ts',
       code: `const e = Error.isError(thrown) ? thrown : new Error(String(thrown))`,

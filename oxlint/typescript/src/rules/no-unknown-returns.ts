@@ -26,7 +26,7 @@ export const noUnknownReturns: Rule = {
     schema: [],
     messages: {
       unknownReturn:
-        'This function returns `unknown`, which every caller has to narrow before it can read the value. Return the type it has once it is parsed. Data whose shape is not known is parsed with a zod schema at the boundary it enters, and `z.infer` gives the type to return.',
+        'This function returns `unknown`, which every caller has to narrow before it can read the value. Return the type it has once it is parsed. Data whose shape is not known is parsed with a zod schema at the boundary it enters, and `z.infer` gives the type to return. A type parameter used one time is `unknown` under another name, and `typescript/no-unnecessary-type-parameters` reports it. Code that truly gives back a value of any shape, such as a deserializer, belongs in a boundary file that the zone of the repository leaves out.',
     },
   },
   create(context) {

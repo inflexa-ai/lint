@@ -3,6 +3,7 @@ package a
 import (
 	"errors"
 	"log/slog"
+	"regexp"
 	"strings"
 )
 
@@ -42,5 +43,33 @@ func status(err error, ce *codeError) int {
 	slog.Error("failed", "error", err.Error())
 	msg := err.Error()
 	_ = strings.ToUpper(err.Error())
+	return len(msg)
+}
+
+var conflict = regexp.MustCompile("conflict")
+
+func local(err error) int {
+	msg := err.Error()
+	if strings.Contains(msg, "x") { // want `the condition reads the text of an error`
+		return 1
+	}
+	if msg == "y" { // want `the condition reads the text of an error`
+		return 2
+	}
+	var text = err.Error()
+	switch text { // want `the condition reads the text of an error`
+	case "z":
+		return 3
+	}
+	if strings.Index(err.Error(), "a") >= 0 || strings.Index(msg, "b") > 0 { // want `the condition reads the text of an error` `the condition reads the text of an error`
+		return 4
+	}
+	if conflict.MatchString(msg) { // want `the condition reads the text of an error`
+		return 5
+	}
+	if ok, _ := regexp.MatchString("c", err.Error()); ok { // want `the condition reads the text of an error`
+		return 6
+	}
+	slog.Error("failed", "error", msg)
 	return len(msg)
 }

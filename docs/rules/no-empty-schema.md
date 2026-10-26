@@ -13,6 +13,7 @@ The rule matters most where a schema is necessary. A backend does not trust a re
 - `z.any()`.
 - `z.unknown()`.
 - `z.custom<T>()` with no argument. With no argument, it looks at nothing at all.
+- `z.custom<T>(check)` where the check takes no parameter, or gives the literal `true`, as in `z.custom<T>(() => true)`. Such a check looks at nothing too.
 
 The message asks for the shape, as in `z.object({ … })`, and the parse fails where the data arrives. Where the shape cannot be written as a schema, `z.custom<T>(check)` takes the function that decides it.
 

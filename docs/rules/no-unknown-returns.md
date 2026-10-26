@@ -13,6 +13,8 @@ A function whose return type is `unknown` hands the caller a value that it canno
 - A return type that is a union with `unknown` in it.
 - A return type that is an alias of the same file, which resolves to `unknown`.
 
+A type parameter that the function uses one time is `unknown` under a different name, as in `declare function read<T>(): T`. `typescript/no-unnecessary-type-parameters` reports it. Thus a type parameter is not a fix. A deserializer that gives back a value of any shape belongs in a boundary file, which the zone of the repository excludes from this rule.
+
 ## What the rule leaves alone
 
 - A generic parameter. A function that returns `T` says nothing about `unknown`, even where a caller later picks `unknown` for `T`.

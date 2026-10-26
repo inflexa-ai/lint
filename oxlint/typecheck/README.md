@@ -77,7 +77,7 @@ export default typecheck({
 - `rules` maps a rule id to `'error'`, `'off'`, or `['error', options]`.
 - For a file and a rule, the last override that matches the file and names the rule sets the severity.
 - `['error', options]` sets the options. `'error'` alone keeps the options of an earlier override that matches the file.
-- `typecheck()` puts its own block first. That block turns on `no-generated-empty-object-type` for `**/*.{ts,tsx}`.
+- `typecheck()` puts its own block first. That block turns on `no-generated-empty-object-type` and `no-lookup-in-loop` for `**/*.{ts,tsx}`.
 
 Each of these problems stops the run with a message: an unknown rule id, a plugin that loads two times under one name, and options that the rule refuses.
 
@@ -90,6 +90,7 @@ Node.js removes the types of the file when it loads it. Thus the file uses only 
 | `must-use-result`                | [must-use-result](https://github.com/inflexa-ai/lint/blob/main/docs/rules/must-use-result.md)                               |
 | `require-abort-signal`           | [require-abort-signal](https://github.com/inflexa-ai/lint/blob/main/docs/rules/require-abort-signal.md)                     |
 | `no-generated-empty-object-type` | [no-generated-empty-object-type](https://github.com/inflexa-ai/lint/blob/main/docs/rules/no-generated-empty-object-type.md) |
+| `no-lookup-in-loop`              | [no-lookup-in-loop](https://github.com/inflexa-ai/lint/blob/main/docs/rules/no-lookup-in-loop.md)                           |
 
 The rules of this package have no prefix. The rules of a plugin have the id `<plugin name>/<rule name>`, where the plugin name is the `name` of the plugin object. The `./typecheck` entry of `@inflexa-ai/oxlint-plugin-react` gives the plugin `@inflexa-ai/react`.
 

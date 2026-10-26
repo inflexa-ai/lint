@@ -29,3 +29,22 @@ func Aliased() *client {
 func ReadAliased(r *request) ([]byte, error) {
 	return io.ReadAll(r.Body) // want `read the request body through the approved body package`
 }
+
+func NewWithNew() *http.Client {
+	return new(http.Client) // want `build the HTTP client in an approved client package`
+}
+
+func Declared() {
+	var c http.Client // want `build the HTTP client in an approved client package`
+	var p *http.Client
+	_, _ = c, p
+}
+
+type Wrapper struct {
+	c *http.Client
+}
+
+func Copy(resp *http.Response, dst io.Writer) error {
+	_, err := io.Copy(dst, resp.Body)
+	return err
+}

@@ -10,7 +10,7 @@ A deadline of its own satisfies `require-abort-signal` and ends nothing at unmou
 
 ## What the rule reports
 
-- A query function, written in place beside its `queryKey`, that does not read the `signal` of its first argument. Read it, as in `({ signal }) => …`, and pass it on to the call. To bound the request as well, combine them: `AbortSignal.any([signal, AbortSignal.timeout(ms)])`. `AbortSignal.any` first shipped in Chrome 116, Edge 116, Firefox 124 and Safari 17.4. For an older browser, use the function in [Combine signals in an older browser](./require-abort-signal.md#combine-signals-in-an-older-browser).
+- A query function, written in place beside its `queryKey`, that does not pass on the `signal` of its first argument. `void signal` and a statement that is only `signal` read the signal, but they give it to nothing. Read it, as in `({ signal }) => …`, and pass it on to the call. To bound the request as well, combine them: `AbortSignal.any([signal, AbortSignal.timeout(ms)])`. `AbortSignal.any` first shipped in Chrome 116, Edge 116, Firefox 124 and Safari 17.4. For an older browser, use the function in [Combine signals in an older browser](./require-abort-signal.md#combine-signals-in-an-older-browser).
 
 ## What the rule leaves alone
 
@@ -22,7 +22,7 @@ A deadline of its own satisfies `require-abort-signal` and ends nothing at unmou
 
 The rule looks for a `queryKey` beside the `queryFn`, wherever the object is written: in a hook call, in `queryOptions`, as an entry of `useQueries`, or in a variable that a hook receives later. A match on the name of the enclosing call was wrong in both directions. An options object built above the call escaped, and an unrelated `database.query({ queryFn })` was reported. With inline disables not permitted, that is an expensive way to be wrong.
 
-The rule asks the scope whether the function reads the signal, through a property or through a member access. A destructured `signal` that the body never mentions again drops the signal at the destructure. That leaves the request as uncancellable as one that never asked for a signal.
+The rule asks the scope whether the function reads the signal, through a property or through a member access. A read counts only when the signal goes into an argument of a call, into the value of a property of an object literal, or into the list of `AbortSignal.any`. The rule looks through parentheses and type assertions. A destructured `signal` that the body never mentions again drops the signal at the destructure. That leaves the request as uncancellable as one that never asked for a signal.
 
 `@typescript-eslint/no-unused-vars` reports the dropped signal too, as a variable that nobody uses, and its suggestion is to remove the destructure. The correct fix is to pass the signal on.
 

@@ -1,6 +1,6 @@
 import type { ESTree, Rule } from '@oxlint/plugins'
 import { optionObject, stringsOption } from '../helpers/rule-options.ts'
-import { globalReadOf } from '../helpers/static-names.ts'
+import { globalReadOf, staticMemberName } from '../helpers/static-names.ts'
 
 /** The options of the rule, once oxlint has merged `meta.defaultOptions` into them. */
 type Options = { allowIn: string[] }
@@ -53,7 +53,7 @@ export const noInstanceofError: Rule = {
     defaultOptions: [DEFAULTS],
     messages: {
       errorCheck:
-        'A generic `{{check}}` check is how error normalising gets copied into every catch block. To add context, rethrow with `{ cause }`. To handle a failure you understand, check for its specific class (`instanceof ApiError`). Turning an arbitrary thrown value into an `Error` belongs in the one module listed under `allowIn` for this rule in oxlint.config.ts.',
+        'A generic `{{check}}` check is how error normalising gets copied into every catch block. To add context, rethrow with `{ cause }`. To handle a failure you understand, check for its specific class (`instanceof ApiError`). Turning an arbitrary thrown value into an `Error` belongs in one module, which `allowIn` of this rule names in oxlint.config.ts. When `allowIn` names no module yet, write that module and add its path to `allowIn`.',
     },
   },
   create(context) {
@@ -76,6 +76,27 @@ export const noInstanceofError: Rule = {
       CallExpression(node) {
         if (checkAt(node.callee, 'Error.isError')) {
           context.report({ node, messageId: 'errorCheck', data: { check: 'Error.isError' } })
+          return
+        }
+        const callee = node.callee.type === 'ChainExpression' ? node.callee.expression : node.callee
+        if (callee.type !== 'MemberExpression') return
+        const method = staticMemberName(callee)
+        const [first] = node.arguments
+        const hasArgument = node.arguments.length > 0
+        // `Error.prototype.isPrototypeOf(value)` and its borrowed form `Object.prototype.isPrototypeOf.call(Error.prototype, value)`.
+        if (method === 'isPrototypeOf' && checkAt(callee.object, 'Error.prototype')) {
+          context.report({ node, messageId: 'errorCheck', data: { check: 'Error.prototype.isPrototypeOf' } })
+        } else if (
+          method === 'call' &&
+          callee.object.type === 'MemberExpression' &&
+          staticMemberName(callee.object) === 'isPrototypeOf' &&
+          hasArgument &&
+          checkAt(first, 'Error.prototype')
+        ) {
+          context.report({ node, messageId: 'errorCheck', data: { check: 'Error.prototype.isPrototypeOf' } })
+        } else if (method === 'instanceof' && hasArgument && checkAt(first, 'Error')) {
+          // A schema of the class, such as `z.instanceof(Error)`, is the same check behind a parser.
+          context.report({ node, messageId: 'errorCheck', data: { check: 'instanceof(Error)' } })
         }
       },
     }

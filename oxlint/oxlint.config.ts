@@ -6,6 +6,13 @@ export default typescript({
   syntax: { regex: false },
   overrides: [
     {
+      // The command reads a configuration in JavaScript, which reaches it
+      // unparsed. The package has no dependency on a schema library, thus its
+      // loader checks the kind of each value by hand.
+      files: ['typecheck/src/config.ts'],
+      rules: { '@inflexa-ai/no-typeof-object': 'off' },
+    },
+    {
       // The workspace tests with vitest, so its tests obey the vitest rules.
       files: ['**/*.test.{ts,tsx}', '**/vitest.config.ts'],
       ...vitest,

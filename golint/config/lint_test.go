@@ -160,6 +160,8 @@ func TestRunOnTheFixture(t *testing.T) {
 		{"gocritic", "modules/iam/reset_internal_test.go", "12", "ruleguard: a hand-written TRUNCATE"},
 		{"gocritic", "modules/iam/reset_internal_test.go", "13", "ruleguard: a hand-written TRUNCATE"},
 		{"gocritic", "modules/iam/reset_internal_test.go", "18", "ruleguard: a hand-written TRUNCATE"},
+		{"gocritic", "modules/iam/state.go", "20", "ruleguard: an empty default"},
+		{"gocritic", "modules/iam/state.go", "29", "ruleguard: an empty default"},
 		{"errtext", "handler/group/group.go", "11", "the condition reads the text of an error"},
 		{"notfoundguard", "handler/group/group.go", "24", "a 404 answer must follow a check of the error kind"},
 		{"blankerr", "modules/iam/iam.go", "18", "the error is discarded"},
@@ -175,6 +177,8 @@ func TestRunOnTheFixture(t *testing.T) {
 		{"nolintlint", "handler/group/group.go", "", ""},
 		{"errcheck", "modules/iam/iam.go", "18", ""},
 		{"gocritic", "modules/iam/path.go", "", "parse a path ID"},
+		{"gocritic", "modules/iam/state.go", "38", ""},
+		{"gocritic", "modules/iam/state.go", "47", ""},
 		{"testplacement", "kernel/conc/conc_test.go", "", ""},
 	} {
 		if has(absent.linter, absent.file, absent.line, absent.text) {

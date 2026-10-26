@@ -21,6 +21,7 @@ const BUILTINS = {
   'must-use-result': fakeRule({ consumers: ['one'] }, stringArraysOnly),
   'require-abort-signal': fakeRule({ declaredIn: [] }, stringArraysOnly),
   'no-generated-empty-object-type': fakeRule({}),
+  'no-lookup-in-loop': fakeRule({}),
 }
 
 /** The ids and options of the rules that are on for a file. */
@@ -73,8 +74,8 @@ describe('loadConfig', () => {
 
   it('uses typecheck() when the working folder has no configuration', async () => {
     const config = await loadConfig(path.join(root, 'none'))
-    expect(activeFor(config, 'src/a.ts')).toEqual({ 'no-generated-empty-object-type': {} })
-    expect(activeFor(config, 'src/view.tsx')).toEqual({ 'no-generated-empty-object-type': {} })
+    expect(activeFor(config, 'src/a.ts')).toEqual({ 'no-generated-empty-object-type': {}, 'no-lookup-in-loop': {} })
+    expect(activeFor(config, 'src/view.tsx')).toEqual({ 'no-generated-empty-object-type': {}, 'no-lookup-in-loop': {} })
     expect(activeFor(config, 'scripts/run.js')).toEqual({})
   })
 
@@ -90,7 +91,7 @@ describe('resolveRules', () => {
   })
 
   it('keeps the default block before the overrides of the repository', () => {
-    const config = typecheck({ overrides: [{ files: ['src/generated/**'], rules: { 'no-generated-empty-object-type': 'off' } }] })
+    const config = typecheck({ overrides: [{ files: ['src/generated/**'], rules: { 'no-generated-empty-object-type': 'off', 'no-lookup-in-loop': 'off' } }] })
     expect(activeFor(config, 'src/generated/a.ts')).toEqual({})
     expect(activeFor(config, 'src/a.ts')).toHaveProperty('no-generated-empty-object-type')
   })
