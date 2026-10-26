@@ -52,12 +52,17 @@ function withoutSource(exports) {
   )
 }
 
+/** The URL of a package on the registry. A scoped name keeps its `/` only as `%2F`. */
+function registryUrl(name) {
+  return `https://registry.npmjs.org/${encodeURIComponent(name)}`
+}
+
 /**
  * Whether npm already has this version of the package. The registry can answer 404 for minutes after a publish, thus the
  * loop below trusts the exit status of `npm publish`, and this check decides only whether an attempt is necessary.
  */
 async function published(name, version) {
-  const response = await fetch(`https://registry.npmjs.org/${name.replace('/', '%2f')}/${version}`)
+  const response = await fetch(`${registryUrl(name)}/${version}`)
   if (response.status === 404) return false
   if (!response.ok) fail(`the registry answered ${String(response.status)} for ${name}@${version}`)
   return true
@@ -69,7 +74,7 @@ function sleep(seconds) {
 
 /** Whether the document of the package, which `npm install` reads to resolve a version, lists this version. */
 async function installable(name, version) {
-  const response = await fetch(`https://registry.npmjs.org/${name.replace('/', '%2f')}`, { headers: { accept: 'application/vnd.npm.install-v1+json' } })
+  const response = await fetch(registryUrl(name), { headers: { accept: 'application/vnd.npm.install-v1+json' } })
   if (response.status === 404) return false
   if (!response.ok) fail(`the registry answered ${String(response.status)} for ${name}`)
   const document = await response.json()
