@@ -14,10 +14,11 @@ The rule is two halves of one guarantee: client state is findable, and it is onl
 ## What the rule leaves alone
 
 - An import of server data outside a store file. The rule reports server data only in a store file.
-- The factory half until `factorySource` is set. With no module named, the rule reports no import.
+- The factory half until `factorySource` or `factoryFile` is set. With no module named, the rule reports no import.
 
 ## Options
 
 - `storeFilePattern` — the file names that count as store files, as a regular expression. Default: `\\.store\\.ts$`.
-- `factorySource` — the module that exports the factory. Default: none. The module belongs to each repository, and without it the placement half has nothing to find.
+- `factorySource` — the specifier of the module that exports the factory, for example an alias. The rule compares the text of each specifier with it. Default: none. The module belongs to each repository, and without it the placement half has nothing to find.
+- `factoryFile` — the absolute path of the module that exports the factory. The rule resolves each relative specifier from the folder of the file, and reports a specifier that names this module. A specifier without the extension, with a different JS or TS extension, or with the folder of an `index` file names the same module. Default: none. Set it together with `factorySource`, because a relative import of the factory does not match the alias text.
 - `bannedInStores` — the imports that a store file cannot make, as regular expressions. Default: `['^@tanstack/(react-)?query']`.

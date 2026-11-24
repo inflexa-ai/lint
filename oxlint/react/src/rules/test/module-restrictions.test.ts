@@ -38,6 +38,8 @@ ruleTester.run('no-direct-zustand', noDirectZustand, {
 
 // The module that exports the factory, which each repository names.
 const factory: [{ factorySource: string }] = [{ factorySource: '@acme/hooks/create-feature-store' }]
+// The same module by its path, for the imports that reach it relatively.
+const factoryFile: [{ factoryFile: string }] = [{ factoryFile: '/repo/src/hooks/create-feature-store.tsx' }]
 
 ruleTester.run('store-placement', storePlacement, {
   valid: [
@@ -59,6 +61,22 @@ ruleTester.run('store-placement', storePlacement, {
     {
       filename: 'apps/lumen/src/modules/files/api/queries.ts',
       code: `import { useQuery } from '@tanstack/react-query'`,
+    },
+    {
+      filename: '/repo/src/modules/files/file-explorer.store.ts',
+      code: `import { createFeatureStore } from '../../hooks/create-feature-store.tsx'`,
+      options: factoryFile,
+    },
+    {
+      filename: '/repo/src/modules/files/file-explorer.tsx',
+      code: `import { useMountEffect } from '../../hooks/use-mount-effect.tsx'`,
+      options: factoryFile,
+    },
+    {
+      // A file of the same name in another folder is another module.
+      filename: '/repo/src/modules/files/file-explorer.tsx',
+      code: `import { createFeatureStore } from './create-feature-store.tsx'`,
+      options: factoryFile,
     },
   ],
   invalid: [
@@ -91,6 +109,39 @@ ruleTester.run('store-placement', storePlacement, {
       code: `const factory = await import(\`@acme/hooks/create-feature-store\`)`,
       options: factory,
       errors: [{ messageId: 'factoryOutsideStore' as const }],
+    },
+    {
+      filename: '/repo/src/modules/files/file-explorer.tsx',
+      code: `import { createFeatureStore } from '../../hooks/create-feature-store.tsx'`,
+      options: factoryFile,
+      errors: [{ messageId: 'factoryOutsideStore' as const, data: { factory: '../../hooks/create-feature-store.tsx', pattern: '\\.store\\.ts$' } }],
+    },
+    {
+      // TypeScript and the bundlers resolve a specifier without its extension, or with the JS extension, to the same file.
+      filename: '/repo/src/modules/files/file-explorer.tsx',
+      code: `import { createFeatureStore } from '../../hooks/create-feature-store'`,
+      options: factoryFile,
+      errors: [{ messageId: 'factoryOutsideStore' as const }],
+    },
+    {
+      filename: '/repo/src/modules/files/file-explorer.tsx',
+      code: `import { createFeatureStore } from '../../hooks/create-feature-store.js'`,
+      options: factoryFile,
+      errors: [{ messageId: 'factoryOutsideStore' as const }],
+    },
+    {
+      // A folder specifier names the index file of the folder.
+      filename: '/repo/src/modules/files/file-explorer.tsx',
+      code: `import { createFeatureStore } from '../../hooks'`,
+      options: [{ factoryFile: '/repo/src/hooks/index.ts' }],
+      errors: [{ messageId: 'factoryOutsideStore' as const }],
+    },
+    {
+      // The two options together: the alias by its text, the path by its resolution.
+      filename: '/repo/src/modules/files/file-explorer.tsx',
+      code: `import { a } from '@acme/hooks/create-feature-store'\nimport { b } from '../../hooks/create-feature-store'`,
+      options: [{ ...factory[0], ...factoryFile[0] }],
+      errors: [{ messageId: 'factoryOutsideStore' as const }, { messageId: 'factoryOutsideStore' as const }],
     },
   ],
 })
