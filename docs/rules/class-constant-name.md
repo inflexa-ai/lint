@@ -17,15 +17,18 @@ A module `const` whose name does not end in `_CLASSES`, when each of these is tr
 
 The rule follows a position through a conditional, a logical expression, a template, an array, a spread and an optional chain. A member expression counts through its root, thus `cn(LOOKS[look].course)` is a use of `LOOKS`.
 
+The rule follows a local `const` to its value, also through destructuring. Thus `const picked = LOOKS[look]` and then `cn(picked.course)` is a use of `LOOKS`. The rule does not follow a `let`, because its value can change.
+
 The rule reports each constant one time, at its declaration. The message gives the new name: the old name in upper snake case, with `_CLASSES` after it.
 
 A default name of the plugin, `className`, `classNames`, `classes`, `style` or `styles`, passes with a string or template value. The default selectors of the plugin match a string value only. Thus `const styles = { a: 'flex' }` gets a report.
 
 ## What the rule leaves alone
 
-- A `const` in a function. The plugin lints by name, and a rename of each local constant is noise.
+- A `const` in a function with a literal value. The plugin lints by name, and a rename of each local constant is noise.
 - An imported constant. The rule reads one file, and the declaration is in a different file.
 - A value of a different kind, for example an array literal or a function.
+- A field of an object in an array, for example `tone` in `PROMPTS.map(({ tone }) => cn(tone))`. Such an object often holds values that are not classes, for example `command: 'hint'`. A `_CLASSES` name makes the plugin lint each of its strings as a class. Keep the classes in a `_CLASSES` object with the item as the key, for example `PROMPT_TONES_CLASSES[prompt.command]`.
 - A constant that goes only into other positions, for example `aria-label`, or into a call of a function that is not a class function.
 - A computed key of a member expression, for example `KEY` in `LOOKS_CLASSES[KEY]`.
 

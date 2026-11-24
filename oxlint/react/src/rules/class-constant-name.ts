@@ -38,12 +38,21 @@ function rootsOf(node: ESTree.Node): Identifier[] {
   }
 }
 
-/** The value of a module `const` that can hold classes, or `undefined` for each other variable. */
-function moduleConstantValue(variable: Variable): ESTree.Expression | undefined {
-  if (variable.scope.type !== 'module' && variable.scope.type !== 'global') return undefined
+/** The initializer of a `const`, also of one that destructures it, or `undefined` for each other variable. */
+function constInit(variable: Variable): ESTree.Expression | undefined {
   const def = variable.defs.at(0)
   if (def?.node.type !== 'VariableDeclarator' || def.parent?.type !== 'VariableDeclaration' || def.parent.kind !== 'const' || def.node.init === null) return undefined
-  const value = unwrapTypeAssertions(def.node.init)
+  return unwrapTypeAssertions(def.node.init)
+}
+
+function isModuleScoped(variable: Variable): boolean {
+  return variable.scope.type === 'module' || variable.scope.type === 'global'
+}
+
+/** The value of a module `const` that can hold classes, or `undefined` for each other variable. */
+function moduleConstantValue(variable: Variable): ESTree.Expression | undefined {
+  const value = isModuleScoped(variable) ? constInit(variable) : undefined
+  if (!value) return undefined
   const holdsClasses = (value.type === 'Literal' && typeof value.value === 'string') || value.type === 'TemplateLiteral' || value.type === 'ObjectExpression'
   return holdsClasses ? value : undefined
 }
@@ -61,10 +70,13 @@ function constantCase(name: string): string {
  * Reported: a module `const` with a string, template or object value, that
  * reaches a `class` or `className` attribute or an argument of a class
  * function such as `cn`, directly or as the root of a member expression. The
- * report is at the declaration, one time for each constant.
+ * rule follows a local `const` to its value, thus `const picked = LOOKS[look]`
+ * and then `cn(picked.b)` is a use of `LOOKS`. The report is at the
+ * declaration, one time for each constant.
  *
- * Not reported: a local `const`, an imported constant, a value of another
- * kind, and a default name of the plugin with a value that is not an object.
+ * Not reported: a local `const` with a literal value, a `let`, an imported
+ * constant, a value of another kind, and a default name of the plugin with a
+ * value that is not an object.
  */
 export const classConstantName: Rule = {
   meta: {
@@ -87,6 +99,13 @@ export const classConstantName: Rule = {
         const variable = variableFor(sourceCode, root)
         if (!variable || seen.has(variable)) continue
         seen.add(variable)
+
+        // A local `const` is an alias, thus its value is a class position too.
+        const alias = isModuleScoped(variable) ? undefined : constInit(variable)
+        if (alias) {
+          check(alias)
+          continue
+        }
 
         const value = moduleConstantValue(variable)
         const { name } = variable

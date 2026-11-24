@@ -12,6 +12,10 @@ createRuleTester().run('class-constant-name', classConstantName, {
     `const className = \`flex\`\nexport const a = cn(className)`,
     // A local constant: the plugin lints by name, and a rename of each local is noise.
     `export function A() {\n  const item = 'flex'\n  return <div className={item} />\n}`,
+    // A `let` alias can change, thus the rule does not follow it.
+    `const LOOKS = { a: 'h-10' }\nexport function A() {\n  let picked = LOOKS\n  return <p className={picked.a} />\n}`,
+    // An alias of a module constant that already has the suffix.
+    `const LOOKS_CLASSES = { a: { b: 'h-10' } }\nexport function A({ look }: { look: 'a' }) {\n  const picked = LOOKS_CLASSES[look]\n  return <p className={picked.b} />\n}`,
     // A constant outside a class position.
     `const LABEL = 'Open'\nexport const A = () => <button aria-label={LABEL} />`,
     `const LABEL = 'Open'\nexport const a = t(LABEL)`,
@@ -40,6 +44,19 @@ createRuleTester().run('class-constant-name', classConstantName, {
     {
       code: `const ON = 'a'\nconst OFF = 'b'\nconst EXTRA = 'c'\nconst WIDE = 'd'\nconst MORE = ['e']\nconst MAP = { x: 'f' }\nexport const A = (on: boolean) => <div className={cn(on ? ON : OFF, on && EXTRA, \`\${WIDE} g\`, [...MORE], MAP?.x)} />`,
       errors: [rename('ON', 'ON_CLASSES'), rename('OFF', 'OFF_CLASSES'), rename('EXTRA', 'EXTRA_CLASSES'), rename('WIDE', 'WIDE_CLASSES'), rename('MAP', 'MAP_CLASSES')],
+    },
+    // A local `const` is an alias: the rule follows its value to the module constant.
+    {
+      code: `const LOOKS = { a: { b: 'h-10' } }\nexport function A({ look }: { look: 'a' }) {\n  const picked = LOOKS[look]\n  return <p className={cn(picked.b)} />\n}`,
+      errors: [{ ...rename('LOOKS', 'LOOKS_CLASSES'), line: 1 }],
+    },
+    {
+      code: `const SIZES = { sm: { control: 'h-8' } }\nexport function A({ size }: { size: 'sm' }) {\n  const { control } = SIZES[size]\n  return <p className={control} />\n}`,
+      errors: [rename('SIZES', 'SIZES_CLASSES')],
+    },
+    {
+      code: `const ITEM = 'flex'\nexport function A({ on }: { on: boolean }) {\n  const base = ITEM\n  const current = on ? base : ''\n  return <p className={current} />\n}`,
+      errors: [rename('ITEM', 'ITEM_CLASSES')],
     },
   ],
 })
