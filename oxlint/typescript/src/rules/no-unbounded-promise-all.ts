@@ -1,5 +1,6 @@
 import type { ESTree, Rule } from '@oxlint/plugins'
 import { optionObject, stringOption } from '../helpers/rule-options.ts'
+import { unwrapTypeAssertions } from '../helpers/expressions.ts'
 import { staticMemberName } from '../helpers/static-names.ts'
 
 const COMBINATORS = new Set(['all', 'allSettled', 'any', 'race'])
@@ -7,14 +8,6 @@ const COMBINATORS = new Set(['all', 'allSettled', 'any', 'race'])
 const MAPPERS = new Set(['map', 'flatMap'])
 
 const DEFAULT_HINT = 'Run the calls through a queue of fixed width: the `mapWithLimit` function of the document of this rule, or a library such as `p-limit`.'
-
-function unwrap(node: ESTree.Node): ESTree.Node {
-  let current = node
-  while (current.type === 'TSAsExpression' || current.type === 'TSSatisfiesExpression' || current.type === 'TSNonNullExpression' || current.type === 'TSTypeAssertion') {
-    current = current.expression
-  }
-  return current
-}
 
 /** Whether the node names the global `Promise`, bare or through `globalThis`. */
 function isPromise(node: ESTree.Node): boolean {
@@ -31,14 +24,14 @@ function isSizedByLength(node: ESTree.Node): boolean {
 
 /** The name of the call that starts one promise for each element of an input, or `undefined`. */
 function fanOutOf(node: ESTree.Node): string | undefined {
-  const call = unwrap(node)
+  const call = unwrapTypeAssertions(node)
   if (call.type !== 'CallExpression' || call.callee.type !== 'MemberExpression') return undefined
   const name = staticMemberName(call.callee)
-  const receiver = unwrap(call.callee.object)
+  const receiver = unwrapTypeAssertions(call.callee.object)
   if (name !== undefined && MAPPERS.has(name)) return receiver.type === 'ArrayExpression' ? undefined : name
   const [source] = call.arguments
   if (name !== 'from' || receiver.type !== 'Identifier' || receiver.name !== 'Array' || call.arguments.length < 2) return undefined
-  return isSizedByLength(unwrap(source)) ? undefined : 'Array.from'
+  return isSizedByLength(unwrapTypeAssertions(source)) ? undefined : 'Array.from'
 }
 
 /**
@@ -79,13 +72,13 @@ export const noUnboundedPromiseAll: Rule = {
 
     return {
       CallExpression(call) {
-        if (call.callee.type !== 'MemberExpression' || !isPromise(unwrap(call.callee.object))) return
+        if (call.callee.type !== 'MemberExpression' || !isPromise(unwrapTypeAssertions(call.callee.object))) return
         const combinator = staticMemberName(call.callee)
         if (combinator === undefined || !COMBINATORS.has(combinator)) return
         if (call.arguments.length === 0) return
         const [argument] = call.arguments
 
-        const input = unwrap(argument)
+        const input = unwrapTypeAssertions(argument)
         const candidates = input.type === 'ArrayExpression' ? input.elements.flatMap((element) => (element?.type === 'SpreadElement' ? [element.argument] : [])) : [input]
         for (const candidate of candidates) {
           const fanOut = fanOutOf(candidate)

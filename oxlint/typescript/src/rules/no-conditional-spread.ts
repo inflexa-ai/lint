@@ -1,13 +1,6 @@
 import type { ESTree, Rule } from '@oxlint/plugins'
+import { unwrapTypeAssertions } from '../helpers/expressions.ts'
 import { staticMemberName, variableFor } from '../helpers/static-names.ts'
-
-function unwrap(node: ESTree.Expression): ESTree.Expression {
-  let current = node
-  while (current.type === 'TSAsExpression' || current.type === 'TSSatisfiesExpression' || current.type === 'TSNonNullExpression' || current.type === 'TSTypeAssertion') {
-    current = current.expression
-  }
-  return current
-}
 
 function isEmptyObject(node: ESTree.Node): boolean {
   return node.type === 'ObjectExpression' && node.properties.length === 0
@@ -62,7 +55,7 @@ export const noConditionalSpread: Rule = {
 
     /** The inside of the object literal the conditional would spread, when there is exactly one and it is short. */
     function directForm(branches: ESTree.Expression[]): string {
-      const objects = branches.map(unwrap)
+      const objects = branches.map((branch) => unwrapTypeAssertions(branch))
       const filled = objects.filter((branch) => branch.type === 'ObjectExpression').filter((object) => object.properties.length > 0)
       if (filled.length !== 1 || !objects.every((branch) => branch === filled[0] || isNothing(branch))) return ''
 
@@ -75,12 +68,12 @@ export const noConditionalSpread: Rule = {
 
     /** The object a branch starts from and the properties it adds, or `undefined` for a branch that copies nothing. */
     function extensionOf(branch: ESTree.Expression): { base: string; added: string[] } | undefined {
-      const node = unwrap(branch)
+      const node = unwrapTypeAssertions(branch)
       if (node.type === 'Identifier' || node.type === 'MemberExpression') return { base: sourceCode.getText(node), added: [] }
       if (node.type !== 'ObjectExpression') return undefined
       const [first, ...rest] = node.properties
       if (node.properties.length === 0 || first.type !== 'SpreadElement') return undefined
-      return { base: sourceCode.getText(unwrap(first.argument)), added: rest.map((property) => sourceCode.getText(property)) }
+      return { base: sourceCode.getText(unwrapTypeAssertions(first.argument)), added: rest.map((property) => sourceCode.getText(property)) }
     }
 
     /** Whether the conditional is the argument of a spread that `check` already reports. */
@@ -110,7 +103,7 @@ export const noConditionalSpread: Rule = {
 
     /** Reports a conditional object that `node` copies into another object. */
     function checkCopied(node: ESTree.Node, value: ESTree.Expression): void {
-      const argument = unwrap(value)
+      const argument = unwrapTypeAssertions(value)
 
       if (argument.type === 'ConditionalExpression') {
         context.report({ node, messageId: 'conditional', data: { direct: directForm([argument.consequent, argument.alternate]) } })
@@ -121,19 +114,19 @@ export const noConditionalSpread: Rule = {
 
       if (argument.operator === '&&') {
         context.report({ node, messageId: 'conditional', data: { direct: directForm([argument.right]) } })
-      } else if (isEmptyObject(unwrap(argument.right))) {
+      } else if (isEmptyObject(unwrapTypeAssertions(argument.right))) {
         context.report({ node, messageId: 'emptyFallback', data: { operator: argument.operator } })
       }
     }
 
     /** Whether a value sets its properties under a condition: one branch is an object and the other is nothing. */
     function isConditionalObject(value: ESTree.Expression): boolean {
-      const node = unwrap(value)
+      const node = unwrapTypeAssertions(value)
       if (node.type === 'ConditionalExpression') {
-        const branches = [unwrap(node.consequent), unwrap(node.alternate)]
+        const branches = [unwrapTypeAssertions(node.consequent), unwrapTypeAssertions(node.alternate)]
         return branches.some((branch) => branch.type === 'ObjectExpression') && branches.some((branch) => isNothing(branch))
       }
-      return node.type === 'LogicalExpression' && node.operator === '&&' && unwrap(node.right).type === 'ObjectExpression'
+      return node.type === 'LogicalExpression' && node.operator === '&&' && unwrapTypeAssertions(node.right).type === 'ObjectExpression'
     }
 
     /** The initializer of the `const` that an identifier names, when it is a conditional object. */
@@ -147,7 +140,7 @@ export const noConditionalSpread: Rule = {
     }
 
     function check(spread: ESTree.SpreadElement | ESTree.JSXSpreadAttribute): void {
-      const argument = unwrap(spread.argument)
+      const argument = unwrapTypeAssertions(spread.argument)
       // The same conditional, moved into a `const` one line above the spread.
       const hoisted = argument.type === 'Identifier' ? hoistedConditional(argument) : undefined
       checkCopied(spread, hoisted ?? spread.argument)

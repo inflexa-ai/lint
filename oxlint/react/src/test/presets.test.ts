@@ -110,6 +110,7 @@ test('the tailwind restrict option turns on the rule with the restricted classes
     files: ['**/*.{ts,tsx}'],
     rules: {
       'better-tailwindcss/enforce-canonical-classes': 'error',
+      '@inflexa-ai/react/class-constant-name': 'error',
       'better-tailwindcss/no-restricted-classes': ['error', { restrict }],
     },
   })
@@ -118,6 +119,9 @@ test('the tailwind restrict option turns on the rule with the restricted classes
 test('without the tailwind restrict option no class is restricted', () => {
   const config = react({ tailwind: { entryPoint: './src/app.css' } })
 
-  expect(config.overrides).toContainEqual({ files: ['**/*.{ts,tsx}'], rules: { 'better-tailwindcss/enforce-canonical-classes': 'error' } })
+  expect(config.overrides).toContainEqual({
+    files: ['**/*.{ts,tsx}'],
+    rules: { 'better-tailwindcss/enforce-canonical-classes': 'error', '@inflexa-ai/react/class-constant-name': 'error' },
+  })
   expect(JSON.stringify(config)).not.toContain('no-restricted-classes')
 })

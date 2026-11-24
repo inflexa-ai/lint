@@ -21,6 +21,22 @@ export type RestrictedClass = { pattern: string; message: string }
 // the namespace of the same package. The specifier type admits no other one.
 const requireReactDoctor = createRequire(import.meta.url) as (specifier: 'eslint-plugin-react-doctor') => typeof import('eslint-plugin-react-doctor')
 
+// SAFETY: as for `requireReactDoctor`, the specifier type admits only the module that the type names.
+const requireTailwindDefaults = createRequire(import.meta.url) as (
+  specifier: 'eslint-plugin-better-tailwindcss/defaults',
+) => typeof import('eslint-plugin-better-tailwindcss/defaults')
+
+/**
+ * The selectors of the Tailwind plugin: its defaults, and each constant whose
+ * name ends in `_CLASSES`, with a string value or the strings of an object at
+ * each depth. A `selectors` setting replaces the defaults of the plugin, thus
+ * they come first. The plugin matches the pattern against the full name.
+ */
+function tailwindSelectors(): unknown[] {
+  const { getDefaultSelectors } = requireTailwindDefaults('eslint-plugin-better-tailwindcss/defaults')
+  return [...getDefaultSelectors(), { kind: 'variable', name: '^.*_CLASSES$', match: [{ type: 'strings' }, { type: 'objectValues' }] }]
+}
+
 const REACT_VERSION = /^([1-9]\d*)(?:\.(0|[1-9]\d*))?(?:\.(0|[1-9]\d*))?$/
 
 // The first major of the version ladder that the React Doctor CLI emits.
@@ -196,9 +212,12 @@ export function react({ tailwind, reactDoctor, overrides = [], env, ...options }
 
   const settings: NonNullable<OxlintConfig['settings']> = { ...base.settings }
   if (reactDoctorConfig) settings['react-doctor'] = reactDoctorConfig.settings
-  if (tailwind) settings['better-tailwindcss'] = { entryPoint: tailwind.entryPoint }
+  if (tailwind) settings['better-tailwindcss'] = { entryPoint: tailwind.entryPoint, selectors: tailwindSelectors() }
 
-  const tailwindRules: NonNullable<OxlintOverride['rules']> = { 'better-tailwindcss/enforce-canonical-classes': 'error' }
+  const tailwindRules: NonNullable<OxlintOverride['rules']> = {
+    'better-tailwindcss/enforce-canonical-classes': 'error',
+    '@inflexa-ai/react/class-constant-name': 'error',
+  }
   if (tailwind?.restrict) {
     tailwindRules['better-tailwindcss/no-restricted-classes'] = ['error', { restrict: tailwind.restrict }]
   }

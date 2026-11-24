@@ -72,6 +72,12 @@ export default react({
 })
 ```
 
+The Tailwind rules lint a constant by its name only. The `tailwind` option adds
+each name that ends in `_CLASSES` to the default names of the plugin. The plugin
+then lints a string value and the strings of an object value. The rule
+`@inflexa-ai/react/class-constant-name` reports a module constant with classes
+and a different name.
+
 For the typed rules, the repository installs `@inflexa-ai/typecheck` and holds the two TypeScript aliases in its
 `devDependencies`: `@typescript/native` at `npm:typescript@7.0.2` for `tsc` and `inflexa-typecheck`, and `typescript`
 at `npm:@typescript/typescript6@^6.0.2` for the editors, which read TypeScript 6. The editors check with TypeScript 6,

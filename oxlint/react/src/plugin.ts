@@ -1,4 +1,5 @@
 import type { Plugin } from '@oxlint/plugins'
+import { classConstantName } from './rules/class-constant-name.ts'
 import { noAppConcerns } from './rules/no-app-concerns.ts'
 import { noDirectZustand } from './rules/no-direct-zustand.ts'
 import { noRawContext } from './rules/no-raw-context.ts'
@@ -16,6 +17,7 @@ export const NAMESPACE = '@inflexa-ai/react'
  * and Router, zustand through a store factory, and a text catalog.
  */
 const rules = {
+  'class-constant-name': classConstantName,
   'no-app-concerns': noAppConcerns,
   'no-direct-zustand': noDirectZustand,
   'no-raw-context': noRawContext,
